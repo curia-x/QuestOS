@@ -67,6 +67,9 @@ void quest_os_main(void)
 
 	process_init();
 
+	printf("Press any key to start scheduler:\n");
+	uart_recv();
+
 	run_scheduler();
 
 	unreachable();

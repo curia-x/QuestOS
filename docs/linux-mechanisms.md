@@ -94,6 +94,7 @@ Arch timer freq:62500000 HZ
 Arch timer resolution:16 ns
 sched_class:sched round robin
 Load 2 processes
+Press any key to start scheduler:
 ============= app 1 ============
 app 1 running ...
 ...

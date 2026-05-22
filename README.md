@@ -113,7 +113,7 @@ debug
 Quest OS 路径后的串口输出节选。重复的用户态 demo 输出已裁剪:
 
 ```sh
-timeout 10s bash -c '{ sleep 1; printf q; } | qemu-system-aarch64 \
+timeout 10s bash -c '{ sleep 1; printf q; sleep 1; printf x; } | qemu-system-aarch64 \
   -M virt,virtualization=false,secure=off,gic-version=3,its=on \
   -m size=1024M \
   -cpu cortex-a72,pmu=on \
@@ -144,6 +144,7 @@ Arch timer freq:62500000 HZ
 Arch timer resolution:16 ns
 sched_class:sched round robin
 Load 2 processes
+Press any key to start scheduler:
 ============= app 1 ============
 app 1 running ...
 ...
