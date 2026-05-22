@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0
+obj-y += main.o
+obj-y += arch/
+obj-y += bootloader/
+obj-y += driver/
+obj-y += kernel/
+obj-y += stub/
+obj-y += uboot_modified/
+obj-y += mm/
+obj-y += linux_porting/
+obj-y += syscall/
+obj-y += schedule/

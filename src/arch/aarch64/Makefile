@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+obj-y += arch_timer.o
+obj-y += bootloader.o
+obj-y += cache.o
+obj-y += exception_entry.o
+obj-y += exception.o
+obj-y += mmu.o
+obj-y += system.o
+obj-y += quest_os_boot.o

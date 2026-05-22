@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-2.0
+COMPILE_OPTIMIZE_FLAGS := -O2 -ffunction-sections -fdata-sections
+DEBUG_FLAGS := -g -Wall
+
+STUB_MACROS := -D__KERNEL__ -D__UBOOT__
+
+CFLAGS += $(DEBUG_FLAGS)
+CFLAGS += $(COMPILE_OPTIMIZE_FLAGS)
+CFLAGS += $(STUB_MACROS)
+CFLAGS += -nostdlib
+CFLAGS += -mgeneral-regs-only
+CFLAGS += -std=gnu11
+CFLAGS += -nostdinc
+CFLAGS += -fno-builtin
+CFLAGS += -Wno-address-of-packed-member
+CFLAGS += -Wno-strict-aliasing
+CFLAGS += -Wno-address-of-packed-member
+CFLAGS += -Wno-address-of-packed-member
+CFLAGS += -fpie -ffreestanding
+
+AFLAGS += -D__ASSEMBLY__
+AFLAGS += $(DEBUG_FLAGS)
+AFLAGS += $(COMPILE_OPTIMIZE_FLAGS)
+AFLAGS += $(STUB_MACROS)
+AFLAGS += -nostdlib
+AFLAGS += -mgeneral-regs-only
+AFLAGS += -std=gnu11
+AFLAGS += -nostdinc
+AFLAGS += -fno-builtin
+AFLAGS += -fpie -ffreestanding
+
+LINKER_OPTIMIZE_FLAGS := --gc-sections
+
+LDFLAGS += $(LINKER_OPTIMIZE_FLAGS)
+LDFLAGS += -pie
+LDFLAGS += --no-warn-rwx-segments

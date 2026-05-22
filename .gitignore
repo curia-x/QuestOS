@@ -1,0 +1,12 @@
+/.vscode/
+/.vscode-ctags
+/build/
+/work_record/
+/tools/
+/test/
+/backup/
+/Makefile.bak
+/*.d
+/*.lds
+/src/arch/aarch64/bootloader.S.bak
+/compile_commands.json

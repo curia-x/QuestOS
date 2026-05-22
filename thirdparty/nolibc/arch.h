@@ -1,0 +1,54 @@
+/*
+ * Copyright (C) 2017-2022 Willy Tarreau <w@1wt.eu>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+#ifndef _NOLIBC_ARCH_H
+#define _NOLIBC_ARCH_H
+
+#if defined(__x86_64__) || defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
+#include "arch-x86.h"
+#elif defined(__ARM_EABI__)
+#include "arch-arm.h"
+#elif defined(__aarch64__)
+#include "arch-arm64.h"
+#elif defined(__mips__)
+#include "arch-mips.h"
+#elif defined(__powerpc__)
+#include "arch-powerpc.h"
+#elif defined(__riscv)
+#include "arch-riscv.h"
+#elif defined(__s390x__)
+#include "arch-s390.h"
+#elif defined(__loongarch__)
+#include "arch-loongarch.h"
+#elif defined(__sparc__)
+#include "arch-sparc.h"
+#elif defined(__m68k__)
+#include "arch-m68k.h"
+#elif defined(__sh__)
+#include "arch-sh.h"
+#else
+#error Unsupported Architecture
+#endif
+
+#endif /* _NOLIBC_ARCH_H */

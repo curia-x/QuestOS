@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: GPL-2.0
+# This is the specify Makefile for building libfdt.lib.
+
+lib_makefile_libfdt_this := $(lastword $(MAKEFILE_LIST))
+libfdt-clean-path = $(patsubst ./%,%,$(subst /./,/,$1))
+this-dir := $(call libfdt-clean-path,$(subst $(ABS_PROJECT_DIR),.,$(realpath $(dir $(lib_makefile_libfdt_this)))))
+src_dir := $(call libfdt-clean-path,$(this-dir)/libfdt)
+out_dir := $(call libfdt-clean-path,$(OUT_DIR))
+
+include scripts/Makefile.include
+
+default: $(out_dir)/lib/libfdt.lib
+
+include $(src_dir)/Makefile.libfdt
+
+lib_objs := $(addprefix $(src_dir)/, $(LIBFDT_OBJS))
+lib_objs := $(call libfdt-clean-path,$(addprefix $(out_dir)/, $(lib_objs)))
+lib_objs_deps := $(patsubst %.o,%.d, $(lib_objs))
+
+-include $(lib_objs_deps)
+
+# INCLUDE += -I$(src_dir)
+CFLAGS += -include $(UBOOT_DIR)/include/linux/libfdt_env.h
+
+$(out_dir)/%.o: %.c
+	$(Q) $(ECHO) "CC	$@"
+	$(Q) $(CC) $(c_flags) $(INCLUDE) -c -o $@ $<
+
+$(out_dir)/lib/libfdt.lib: $(lib_objs)
+	$(Q) $(ECHO) "AR	$@"
+	$(Q) $(AR) rcSTPD $@ $^

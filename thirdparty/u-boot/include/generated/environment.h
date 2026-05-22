@@ -1,0 +1,1 @@
+#define CONFIG_EXTRA_ENV_TEXT "boot_targets=qfw usb scsi virtio nvme dhcp\0fdt_addr=0x40000000\0fdt_high=0xffffffff\0initrd_high=0xffffffff\0kernel_addr_r=0x40400000\0pxefile_addr_r=0x40300000\0ramdisk_addr_r=0x45000000\0scriptaddr=0x40200000\0stderr=serial,vidconsole\0stdin=serial,usbkbd\0stdout=serial,vidconsole\0"

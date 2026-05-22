@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: GPL-2.0
+# process_package.toml
+
+image_dir = "../../build/app"
+
+default_flags = ["user", "exec"]
+default_stack_size = 65536
+
+[[images]]
+name = "test_syscall"
+file = "test_syscall.elf"
+args = ["--verbose"]
+env = [
+    "PATH=/bin",
+    "TERM=vt100",
+]
+
+[images.auxv]
+AT_PAGESZ = 4096
+AT_CLKTCK = 100
+
+
+[[images]]
+name = "hello"
+file = "hello.elf"
+args = ["arg1", "arg2"]
+
+# [[images]]
+# name = "raw_test"
+# type = "flat"
+# file = "raw_test.bin"
+# load_hint = 0x40000000
+# entry_hint = 0x40000000

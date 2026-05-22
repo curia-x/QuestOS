@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0
+
+suffix-search = $(strip $(foreach s, $3, $($(1:%$(strip $2)=%$s))))
+
+real-search = $(foreach m, $1, $(if $(call suffix-search, $m, $2, $3 -), $(call suffix-search, $m, $2, $3), $m))
+
+depfile = $(basename $@).d
+depflags = -MMD -MP -MF $(depfile) -MT $@
+c_flags = $(CFLAGS) $(depflags)
+a_flags = $(AFLAGS) $(depflags)

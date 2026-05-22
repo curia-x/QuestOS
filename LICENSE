@@ -1,0 +1,17 @@
+Quest OS Licensing
+==================
+
+Quest OS uses per-file SPDX license identifiers.
+
+The license for each source file is the SPDX expression in that file's
+`SPDX-License-Identifier` line. If a file does not contain an SPDX identifier,
+its license status must be checked before redistribution.
+
+Unless a file states otherwise, Quest OS-authored source is intended to be
+licensed under GPL-2.0-family terms. Some files in this repository are imported
+or adapted from upstream projects including Linux, U-Boot, libfdt, Linux UAPI,
+and nolibc. Those files remain under their upstream licenses.
+
+See `THIRD_PARTY_NOTICES.md` for the vendored component inventory and license
+summary. Preserve all SPDX identifiers, copyright notices, and upstream license
+headers when redistributing or modifying this code.
