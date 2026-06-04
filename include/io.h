@@ -3,7 +3,7 @@
 #define __IO_H__
 
 #include <linux/types.h>
-#include <barrier.h>
+#include <asm/barrier.h>
 
 /*
  * Generic IO read/write.  These perform native-endian accesses.

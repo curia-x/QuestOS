@@ -122,6 +122,13 @@ SECTIONS
 
     . = ALIGN(PAGE_SIZE);
 
+    __percpu_start = .;
+    .data..percpu : ALIGN(8) {
+        *(.data..percpu)
+    }
+    . = ALIGN(PAGE_SIZE);
+    __percpu_end = .;
+
     __bss_start = .;
     .bss  : { *(.bss .bss.*) *(COMMON) }
     .sbss : { *(.sbss .sbss.*) }

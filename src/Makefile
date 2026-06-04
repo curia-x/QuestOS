@@ -10,3 +10,4 @@ obj-y += mm/
 obj-y += linux_porting/
 obj-y += syscall/
 obj-y += schedule/
+obj-y += smp/

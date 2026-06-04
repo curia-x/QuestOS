@@ -14,6 +14,7 @@
 #include <linux/math.h>
 #include <linux/types.h>
 #include <xarray.h>
+#include <percpu.h>
 #include <stub.h>
 
 /* Keep unconverted code working */
@@ -27,7 +28,7 @@ struct radix_tree_preload {
 	struct radix_tree_node *nodes;
 };
 
-extern DECLARE_PER_CPU(struct radix_tree_preload, radix_tree_preloads);
+DECLARE_PER_CPU(struct radix_tree_preload, radix_tree_preloads);
 
 /*
  * The bottom two bits of the slot determine how the remaining bits in the

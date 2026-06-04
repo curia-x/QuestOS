@@ -4,8 +4,6 @@
 
 #ifndef __ASSAMBLY__
 
-#define DECLARE_PER_CPU(struct_type, var) struct_type var
-#define DEFINE_PER_CPU(struct_type, var) struct_type var
 #define EXPORT_PER_CPU_SYMBOL_GPL(var)
 #define call_rcu(head, func) do { \
 	if (head) { \
@@ -61,10 +59,6 @@ do {									      \
 #define in_softirq() false
 #define in_irq() false
 #define in_nmi() false
-
-#define this_cpu_ptr(ptr) (ptr)
-
-#define per_cpu(var, cpu) (var)
 
 #define kmem_cache_free(cache, ptr) kfree(ptr)
 #define kmem_cache_create(name, size, align, flags, ctor) NULL

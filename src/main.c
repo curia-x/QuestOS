@@ -12,6 +12,8 @@
 #include <mm.h>
 #include <vmalloc.h>
 #include <sched.h>
+#include <percpu.h>
+#include <smp.h>
 
 #define CACHELINE_SIZE 64
 /*
@@ -40,6 +42,10 @@ void quest_os_main(void)
 	init_printf_done();
 
 	mm_post_init();
+
+	smp_init();
+
+	per_cpu_init();
 
 	printf("\r\n===============Welcome to Quest OS!===============\r\n");
 

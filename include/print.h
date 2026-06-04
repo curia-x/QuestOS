@@ -10,5 +10,7 @@ void printf_set_forbid(void);
 #define pr_warn printf
 #define pr_err printf
 #define pr_warn_ratelimited printf
+#define pr_crit printf
+#define pr_crit_once printf
 
 #endif
