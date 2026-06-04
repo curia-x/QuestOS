@@ -21,34 +21,29 @@
 #include <mmio.h>
 #include <system.h>
 #include <irq.h>
+#include <smp.h>
+#include <percpu.h>
 
 #define FLAGS_WORKAROUND_INSECURE		(1ULL << 3)
-
-#define get_smp_processor_id() 0
 
 /* Our default, arbitrary priority value. Linux only uses one anyway. */
 #define DEFAULT_PMR_VALUE	0xf0
 
-struct rdist {
-		void __iomem	*rd_base;
-		struct page	*pend_page;
-		phys_addr_t	phys_base;
-		u64             flags;
-		void		*vpe_l1_base;
-} __percpu;
+struct redist {
+	void __iomem	*rd_base;
+	struct page	*pend_page;
+	phys_addr_t	phys_base;
+	u64             flags;
+	void		*vpe_l1_base;
+};
 
-struct my_rdists {
-	struct rdist	*rdist;
-	phys_addr_t		prop_table_pa;
-	void			*prop_table_va;
-	u64			flags;
+struct gic_features {
 	u32			gicd_typer;
 	u32			gicd_typer2;
-	int                     cpuhp_memreserve_state;
-	bool			has_vlpis;
-	bool			has_rvpeid;
-	bool			has_direct_lpi;
-	bool			has_vpend_valid_dirty;
+	bool		has_vlpis;
+	bool		has_rvpeid;
+	bool		has_direct_lpi;
+	bool		has_vpend_valid_dirty;
 };
 
 struct redist_region {
@@ -61,8 +56,9 @@ struct gic_chip_data {
 	struct fwnode_handle	*fwnode;
 	phys_addr_t		dist_phys_base;
 	void __iomem		*dist_base;
+	struct gic_features		features;
 	struct redist_region	*redist_regions;
-	struct my_rdists		rdists;
+	struct redist	redists[MAX_CPUS];
 	struct irq_domain	*domain;
 	u64			redist_stride;
 	u32			nr_redist_regions;
@@ -72,22 +68,19 @@ struct gic_chip_data {
 	struct partition_desc	**ppi_descs;
 };
 
+DEFINE_PER_CPU(bool, has_rss);
+
 static struct gic_chip_data gic_data;
-
-static struct rdist g_rdist;
-
 static bool supports_pseudo_nmis;
 
-#define GIC_ID_NR	(1U << GICD_TYPER_ID_BITS(gic_data.rdists.gicd_typer))
-#define GIC_LINE_NR	min(GICD_TYPER_SPIS(gic_data.rdists.gicd_typer), 1020U)
-#define GIC_ESPI_NR	GICD_TYPER_ESPIS(gic_data.rdists.gicd_typer)
+#define GIC_ID_NR	(1U << GICD_TYPER_ID_BITS(gic_data.features.gicd_typer))
+#define GIC_LINE_NR	min(GICD_TYPER_SPIS(gic_data.features.gicd_typer), 1020U)
+#define GIC_ESPI_NR	GICD_TYPER_ESPIS(gic_data.features.gicd_typer)
 
 static bool nmi_support_forbidden;
 
 static bool cpus_have_security_disabled;
 static bool cpus_have_group0;
-
-static bool g_cpu_interface_hasrss;
 
 /*
  * There are 16 SGIs, though we only actually use 8 in Linux. The other 8 SGIs
@@ -97,7 +90,7 @@ static bool g_cpu_interface_hasrss;
 #define SGI_NR		16
 
 #define MPIDR_RS(mpidr)			(((mpidr) & 0xF0UL) >> 4)
-#define gic_data_rdist()		(gic_data.rdists.rdist)
+#define gic_data_rdist()		(&(gic_data.redists[get_smp_processor_id()]))
 #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
 #define gic_data_rdist_sgi_base()	(gic_data_rdist_rd_base() + SZ_64K)
 
@@ -168,7 +161,7 @@ static int __gic_update_rdist_properties(struct redist_region *region,
 		__raw_writeq(val, ptr + SZ_128K + GICR_VPROPBASER);
 	}
 
-	gic_data.rdists.has_vlpis &= !!(typer & GICR_TYPER_VLPIS);
+	gic_data.features.has_vlpis &= !!(typer & GICR_TYPER_VLPIS);
 
 	/*
 	 * TYPER.RVPEID implies some form of DirectLPI, no matter what the
@@ -179,18 +172,18 @@ static int __gic_update_rdist_properties(struct redist_region *region,
 	 * on the revision of the architecture and its relaxations over
 	 * time. Just group them under the 'direct_lpi' banner.
 	 */
-	gic_data.rdists.has_rvpeid &= !!(typer & GICR_TYPER_RVPEID);
-	gic_data.rdists.has_direct_lpi &= (!!(typer & GICR_TYPER_DirectLPIS) |
+	gic_data.features.has_rvpeid &= !!(typer & GICR_TYPER_RVPEID);
+	gic_data.features.has_direct_lpi &= (!!(typer & GICR_TYPER_DirectLPIS) |
 					   !!(ctlr & GICR_CTLR_IR) |
-					   gic_data.rdists.has_rvpeid);
-	gic_data.rdists.has_vpend_valid_dirty &= !!(typer & GICR_TYPER_DIRTY);
+					   gic_data.features.has_rvpeid);
+	gic_data.features.has_vpend_valid_dirty &= !!(typer & GICR_TYPER_DIRTY);
 
 	/* Detect non-sensical configurations */
-	if (gic_data.rdists.has_rvpeid && !gic_data.rdists.has_vlpis) {
+	if (gic_data.features.has_rvpeid && !gic_data.features.has_vlpis) {
 		printf("GICR @0x%p: has RVPEID but no VLPIs, disabling DirectLPI support\n", ptr);
-		gic_data.rdists.has_direct_lpi = false;
-		gic_data.rdists.has_vlpis = false;
-		gic_data.rdists.has_rvpeid = false;
+		gic_data.features.has_direct_lpi = false;
+		gic_data.features.has_vlpis = false;
+		gic_data.features.has_rvpeid = false;
 	}
 
 	gic_data.ppi_nr = min(GICR_TYPER_NR_PPIS(typer), gic_data.ppi_nr);
@@ -248,13 +241,13 @@ static void gic_update_rdist_properties(void)
 	printf("GICv3 features: %d PPIs%s%s\n",
 		gic_data.ppi_nr,
 		gic_data.has_rss ? ", RSS" : "",
-		gic_data.rdists.has_direct_lpi ? ", DirectLPI" : "");
+		gic_data.features.has_direct_lpi ? ", DirectLPI" : "");
 
-	if (gic_data.rdists.has_vlpis)
+	if (gic_data.features.has_vlpis)
 		printf("GICv4 features: %s%s%s\n",
-			gic_data.rdists.has_direct_lpi ? "DirectLPI " : "",
-			gic_data.rdists.has_rvpeid ? "RVPEID " : "",
-			gic_data.rdists.has_vpend_valid_dirty ? "Valid+Dirty " : "");
+			gic_data.features.has_direct_lpi ? "DirectLPI " : "",
+			gic_data.features.has_rvpeid ? "RVPEID " : "",
+			gic_data.features.has_vpend_valid_dirty ? "Valid+Dirty " : "");
 }
 
 static void gic_cpu_sys_reg_enable(void)
@@ -427,18 +420,11 @@ void gic_dist_config(void __iomem *base, int gic_irqs, u8 priority)
 	}
 }
 
-u64 cpu_logical_map(unsigned int cpu)
+static u64 gic_mpidr_to_affinity(u64 mpidr)
 {
-	(void)cpu;
-	return read_sysreg_s(SYS_MPIDR_EL1) & MPIDR_HWID_BITMASK;
-}
-
-static u64 gic_cpu_to_affinity(int cpu)
-{
-	u64 mpidr = cpu_logical_map(cpu);
 	u64 aff;
 
-	aff = ((u64)MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
+	aff = ((u64)MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
 	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
 	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
 	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
@@ -488,7 +474,7 @@ static void gic_dist_init(void)
 	gic_dist_config(base, GIC_LINE_NR, dist_prio_irq);
 
 	val = GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1;
-	if (gic_data.rdists.gicd_typer2 & GICD_TYPER2_nASSGIcap) {
+	if (gic_data.features.gicd_typer2 & GICD_TYPER2_nASSGIcap) {
 		printf("Enabling SGIs without active state\n");
 		val |= GICD_CTLR_nASSGIreq;
 	}
@@ -503,7 +489,7 @@ static void gic_dist_init(void)
 	 * enabled.
 	 */
 	/* 设置默认路由，全都路由到boot cpu */
-	affinity = gic_cpu_to_affinity(get_smp_processor_id());
+	affinity = gic_mpidr_to_affinity(get_mpidr_el1());
 	for (i = 32; i < GIC_LINE_NR; i++)
 		__raw_writeq(affinity, base + GICD_IROUTER + i * 8);
 
@@ -513,20 +499,12 @@ static void gic_dist_init(void)
 
 static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 {
-	unsigned long mpidr;
-	u64 typer;
 	u32 aff;
+	u64 typer;
+	u64 mpidr = get_mpidr_el1();
+	int cpu = mpidr_to_processor_id(mpidr);
 
-	/*
-	 * Convert affinity to a 32bit value that can be matched to
-	 * GICR_TYPER bits [63:32].
-	 */
-	mpidr = gic_cpu_to_affinity(get_smp_processor_id());
-
-	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
-	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
-	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
-	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
+	aff = gic_mpidr_to_affinity(mpidr);
 
 	typer = read_u64(ptr + GICR_TYPER);
 	if ((typer >> 32) == aff) {
@@ -536,7 +514,7 @@ static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 		gic_data_rdist()->phys_base = region->phys_base + offset;
 
 		printf("CPU%d: found redistributor %lx region %d:0x%p\n",
-			get_smp_processor_id(), mpidr,
+			cpu, mpidr,
 			(int)(region - gic_data.redist_regions),
 			&gic_data_rdist()->phys_base);
 		return 0;
@@ -548,13 +526,14 @@ static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 
 static int gic_populate_rdist(void)
 {
+	u64 mpidr = get_mpidr_el1();
+
 	if (gic_iterate_rdists(__gic_populate_rdist) == 0)
 		return 0;
 
 	/* We couldn't even deal with ourselves... */
 	printf("CPU%d: mpidr %lx has no re-distributor!\n",
-	     get_smp_processor_id(),
-	     (unsigned long)cpu_logical_map(get_smp_processor_id()));
+	     mpidr_to_processor_id(mpidr), mpidr);
 	return -ENODEV;
 }
 
@@ -626,13 +605,14 @@ static inline bool gic_supports_nmi(void)
 
 static void gic_cpu_sys_reg_init(void)
 {
-	// int i;
-	// int cpu = get_smp_processor_id();
-	// u64 mpidr = gic_cpu_to_affinity(cpu);
-	// u64 need_rss = MPIDR_RS(mpidr);
+	int i;
+	int cpu;
+	int mpidr = get_mpidr_el1();
+	u64 need_rss = MPIDR_RS(mpidr);
 	bool group0;
 	u32 pribits;
 
+	cpu = mpidr_to_processor_id(mpidr);
 	pribits = gic_get_pribits();
 
 	group0 = gic_has_group0();
@@ -690,19 +670,21 @@ static void gic_cpu_sys_reg_init(void)
 	gic_write_grpen1(1);
 
 	/* Keep the RSS capability status in per_cpu variable */
-	g_cpu_interface_hasrss = !!(gic_read_ctlr() & ICC_CTLR_EL1_RSS);
+	per_cpu(has_rss, cpu) = !!(gic_read_ctlr() & ICC_CTLR_EL1_RSS);
 
 	/* Check all the CPUs have capable of sending SGIs to other CPUs */
-	// for_each_online_cpu(i) {
-	// 	bool have_rss = g_cpu_interface_hasrss;
-	// 	// bool have_rss = per_cpu(has_rss, i) && per_cpu(has_rss, cpu);
+	for_each_online_cpu(i) {
+		if (i == cpu)
+			continue;
 
-	// 	need_rss |= MPIDR_RS(gic_cpu_to_affinity(i));
-	// 	if (need_rss && (!have_rss))
-	// 		pr_crit("CPU%d (%lx) can't SGI CPU%d (%lx), no RSS\n",
-	// 			cpu, (unsigned long)mpidr,
-	// 			i, (unsigned long)gic_cpu_to_affinity(i));
-	// }
+		bool have_rss = per_cpu(has_rss, i) && per_cpu(has_rss, cpu);
+
+		need_rss |= MPIDR_RS(gic_mpidr_to_affinity(cpu_logical_map(i)));
+		if (need_rss && (!have_rss))
+			pr_crit("CPU%d (%lx) can't SGI CPU%d (%lx), no RSS\n",
+				cpu, (unsigned long)mpidr,
+				i, (unsigned long)gic_mpidr_to_affinity(cpu_logical_map(i)));
+	}
 
 	/**
 	 * GIC spec says, when ICC_CTLR_EL1.RSS==1 and GICD_TYPER.RSS==0,
@@ -711,8 +693,8 @@ static void gic_cpu_sys_reg_init(void)
 	 *   - The write is ignored.
 	 *   - The RS field is treated as 0.
 	 */
-	// if (need_rss && (!gic_data.has_rss))
-	// 	pr_crit_once("RSS is required but GICD doesn't support it\n");
+	if (need_rss && (!gic_data.has_rss))
+		pr_crit_once("RSS is required but GICD doesn't support it\n");
 }
 
 static void gic_cpu_init(void)
@@ -769,20 +751,18 @@ static int gic_init_bases(phys_addr_t dist_phys_base,
 	 * Find out how many interrupts are supported.
 	 */
 	typer = read_u32(gic_data.dist_base + GICD_TYPER);
-	gic_data.rdists.gicd_typer = typer;
+	gic_data.features.gicd_typer = typer;
 
 	printf("%d SPIs implemented\n", GIC_LINE_NR - 32);
 	printf("%d Extended SPIs implemented\n", GIC_ESPI_NR);
 
-	gic_data.rdists.gicd_typer2 = read_u32(gic_data.dist_base + GICD_TYPER2);
-
-	gic_data.rdists.rdist = &g_rdist;
+	gic_data.features.gicd_typer2 = read_u32(gic_data.dist_base + GICD_TYPER2);
 
 	/* 先赋值成true，后面再根据每个GICR的情况做&=处理 */
-	gic_data.rdists.has_rvpeid = true;
-	gic_data.rdists.has_vlpis = true;
-	gic_data.rdists.has_direct_lpi = true;
-	gic_data.rdists.has_vpend_valid_dirty = true;
+	gic_data.features.has_rvpeid = true;
+	gic_data.features.has_vlpis = true;
+	gic_data.features.has_direct_lpi = true;
+	gic_data.features.has_vpend_valid_dirty = true;
 
 	gic_data.has_rss = !!(typer & GICD_TYPER_RSS);
 

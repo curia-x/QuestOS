@@ -13,7 +13,7 @@
 
 #include <linux/irqchip/arm-gic-common.h>
 #include <linux/stringify.h>
-#include <barrier.h>
+#include <asm/barrier.h>
 #include <cacheflush.h>
 
 #define read_gicreg(r)			read_sysreg_s(SYS_ ## r)
