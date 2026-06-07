@@ -7,3 +7,6 @@ obj-y += exception.o
 obj-y += mmu.o
 obj-y += system.o
 obj-y += quest_os_boot.o
+obj-y += psci.o
+obj-y += smc.o
+obj-y += smccc.o
