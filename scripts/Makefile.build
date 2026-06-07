@@ -17,13 +17,22 @@ $(default_target):
 include scripts/Makefile.include
 include $(src)/Makefile
 
+ASM_OFFSETS_H = $(PROJECT_DIR)/include/asm/generated/asm-offsets.h
+
 ############## For object compile. ##############
+
+$(ASM_OFFSETS_H): $(SRC_DIR)/common/asm-offsets.c
+	@mkdir -p $(dir $@)
+	@mkdir -p $(OUT_DIR)/src/common/
+	$(Q) $(ECHO) "GEN	$@"
+	$(Q) $(CC) $(c_flags) $(INCLUDE) -S -o $(OUT_DIR)/src/common/asm-offsets.S $<
+	$(Q) /bin/sh $(PROJECT_DIR)/scripts/gen-asm-offsets.sh $(OUT_DIR)/src/common/asm-offsets.S > $@
 
 $(OUT_DIR)/%.o: %.c
 	$(Q) $(ECHO) "CC	$@"
 	$(Q) $(CC) $(c_flags) $(INCLUDE) -c -o $@ $<
 
-$(OUT_DIR)/%.o: %.S
+$(OUT_DIR)/%.o: %.S $(ASM_OFFSETS_H)
 	$(Q) $(ECHO) "AS	$@"
 	$(Q) $(CC) $(a_flags) $(INCLUDE) -c -o $@ $<
 

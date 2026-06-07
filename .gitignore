@@ -1,6 +1,7 @@
 /.vscode/
 /.vscode-ctags
 /build/
+/include/asm/generated/
 /work_record/
 /tools/
 /test/
@@ -8,5 +9,8 @@
 /Makefile.bak
 /*.d
 /*.lds
+/core.*
+/serial.log
+/t.txt
 /src/arch/aarch64/bootloader.S.bak
 /compile_commands.json

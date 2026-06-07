@@ -129,7 +129,7 @@ all: $(OUT_DIR)/$(PROJECT_NAME)_kernel.bin $(OUT_DIR)/$(PROJECT_NAME)_pack_all.b
 
 PHONY += clean
 clean:
-	$(Q) $(ECHO) "Deleting *.o *.a *.d *.lib *.bin *.elf *.lds $(PROJECT_NAME)_kernel  $(PROJECT_NAME)_app_pack"
+	$(Q) $(ECHO) "Cleaning *.o *.a *.d *.lib *.bin *.elf *.lds"
 	$(Q) find $(OUT_DIR) -type f \( -name '*.o' -o \
 									-name '*.a' -o \
 									-name '*.d' -o \
@@ -137,9 +137,14 @@ clean:
 									-name '*.bin' -o \
 									-name '*.elf' -o \
 									-name '*.lds' -o \
-									-name '$(PROJECT_NAME)_kernel' -o \
+									\) \
+						-delete  2>/dev/null || true
+	$(Q) $(ECHO) "Cleaning $(PROJECT_NAME)_kernel  $(PROJECT_NAME)_app_pack"
+	$(Q) find $(OUT_DIR) -type f \( -name '$(PROJECT_NAME)_kernel' -o \
 									-name '$(PROJECT_NAME)_app_pack' \
 									\) \
 						-delete  2>/dev/null || true
+	$(Q) $(ECHO) "Cleaning generated header files"
+	$(Q) rm -rf $(PROJECT_DIR)/include/asm/generated/
 
 .PHONY: $(PHONY)
