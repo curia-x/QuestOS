@@ -3,7 +3,7 @@
 #define IRQ_H
 #include <linux/types.h>
 #include <linux/compiler_attributes.h>
-#include <exception.h>
+#include <arch_exception.h>
 #include <interrupt.h>
 #include <ptrace.h>
 
@@ -133,9 +133,16 @@ int set_handle_fiq(void (*handle_fiq)(struct pt_regs *));
 
 int irq_chip_register(struct irq_chip *chip);
 
-static inline void system_irq_enable(void)
-{
-	daif_clr(DAIF_BIT_F | DAIF_BIT_I);
-}
+#define local_interrupt_enable	arch_local_interrupt_enable
+#define local_interrupt_disable	arch_local_interrupt_disable
+
+#define local_irq_enable arch_local_irq_enable
+#define local_irq_disable arch_local_irq_disable
+
+#define local_irq_save(flags) do {	\
+	flags = arch_local_irq_save();	\
+} while(0)
+
+#define local_irq_restore arch_local_irq_restore
 
 #endif /* IRQ_H */

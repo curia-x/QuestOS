@@ -33,7 +33,7 @@ int request_irq(unsigned int hwirq, irq_handler_t handler, unsigned long flags,
 		return -EINVAL;
 	}
 
-	if (desc->action) {
+	if (desc->action && desc->action->handler != handler) {
 		printf("Hwirq:%d, has been requested by %s\n", hwirq, desc->action->name);
 		return -EEXIST;
 	}

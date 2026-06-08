@@ -2,7 +2,8 @@
 #ifndef PRINK_H
 #define PRINK_H
 
-int printf(const char *fmt, ...);
+int printk(const char *fmt, ...);
+#define printf(...) printk(__VA_ARGS__)
 void init_printf_done(void);
 void printf_set_ready(void);
 void printf_set_forbid(void);

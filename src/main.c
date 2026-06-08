@@ -61,7 +61,7 @@ void quest_os_main(void)
 		goto exit;
 	}
 
-	system_irq_enable();
+	local_interrupt_enable();
 
 	round_robin_sched_register();
 

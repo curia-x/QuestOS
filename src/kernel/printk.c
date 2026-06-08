@@ -6,9 +6,10 @@
 
 #include <linux/string.h>
 #include <uart.h>
+#include <spinlock.h>
 
 #define CONSOLE_PRINT_BUFFER_SIZE 1024
-static char print_buf[CONSOLE_PRINT_BUFFER_SIZE];
+static char g_print_buf[CONSOLE_PRINT_BUFFER_SIZE];
 
 /* record buffer*/
 #define CONFIG_LOG_BUF_SHIFT 17
@@ -359,53 +360,31 @@ int printk(const char *fmt, ...)
 	va_list arg;
 	int len = 0;
 	int i;
+	unsigned long flags;
+	static struct spinlock lock = SPINLOCK_INIT;
 
 	if (g_printk_status == PRINTK_STATUS_FORBID)
 		return 0;
 
+	spin_lock_irqsave(&lock, flags);
+
 	va_start(arg, fmt);
-	len += myprintf(print_buf, sizeof(print_buf), fmt, arg);
+	len += myprintf(g_print_buf, sizeof(g_print_buf), fmt, arg);
 	va_end(arg);
 
 	/* record it into logbuffer*/
 	if (g_printk_status == PRINTK_STATUS_DOWN) {
-		memcpy(g_record, print_buf, len);
+		memcpy(g_record, g_print_buf, len);
 		g_record += len;
 		g_record_len += len;
 
+		spin_unlock_irqrestore(&lock, flags);
 		return len;
 	}
 
 	for (i = 0; i < len; i++)
-		putchar(print_buf[i]);
-
-	return len;
-}
-
-int printf(const char *fmt, ...)
-{
-	va_list arg;
-	int len = 0;
-	int i;
-
-	if (g_printk_status == PRINTK_STATUS_FORBID)
-		return 0;
-
-	va_start(arg, fmt);
-	len += myprintf(print_buf, sizeof(print_buf), fmt, arg);
-	va_end(arg);
-
-	/* record it into logbuffer*/
-	if (g_printk_status == PRINTK_STATUS_DOWN) {
-		memcpy(g_record, print_buf, len);
-		g_record += len;
-		g_record_len += len;
-
-		return len;
-	}
-
-	for (i = 0; i < len; i++)
-		putchar(print_buf[i]);
+		putchar(g_print_buf[i]);
+	spin_unlock_irqrestore(&lock, flags);
 
 	return len;
 }
