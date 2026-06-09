@@ -7,8 +7,8 @@ default_flags = ["user", "exec"]
 default_stack_size = 65536
 
 [[images]]
-name = "test_syscall"
-file = "test_syscall.elf"
+name = "app1"
+file = "app1.elf"
 args = ["--verbose"]
 env = [
     "PATH=/bin",
@@ -21,8 +21,18 @@ AT_CLKTCK = 100
 
 
 [[images]]
-name = "hello"
-file = "hello.elf"
+name = "app2"
+file = "app2.elf"
+args = ["arg1", "arg2"]
+
+[[images]]
+name = "app3"
+file = "app3.elf"
+args = ["arg1", "arg2"]
+
+[[images]]
+name = "app4"
+file = "app4.elf"
 args = ["arg1", "arg2"]
 
 # [[images]]
