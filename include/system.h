@@ -26,31 +26,50 @@ void record_enter_in_kernel(void);
 // 	asm volatile("yield" ::: "memory");
 // }
 
+#define __BUG(cond_str) do {						\
+	const char *__cond_str = (cond_str);					\
+	printf("BUG:%s, %d%s%s\r\n",	\
+			__func__, __LINE__, \
+			__cond_str[0] == '\0' ? "" : ": ", \
+			(cond_str));	\
+	while (1)							\
+		;							\
+} while (0)
+
 #undef BUG
-#define BUG()
+#define BUG()								\
+	__BUG("")
 
-#define BUG_ON(cond)	do {	\
-	if (unlikely(cond))	\
-		printf("BUG:%s, %d: %s\r\n", __func__, __LINE__, #cond);	\
-} while(0)
+#define BUG_ON(cond) do {						\
+	if (unlikely(cond))						\
+		__BUG(#cond);						\
+} while (0)
 
-#define WARN(cond, format...) ({					\
-	int __ret_warn_on = !!(cond);				\
-	if (unlikely(__ret_warn_on))					\
-		printf(format);						\
-	unlikely(__ret_warn_on);				\
+#define __WARN_PRINT(func, line, fmt, ...)				\
+	printf("WARN:%s, %d: " fmt,				\
+	       func, line, ##__VA_ARGS__)
+
+#define WARN(cond, fmt, ...) ({						\
+	int __ret_warn = !!(cond);					\
+	if (unlikely(__ret_warn))					\
+		__WARN_PRINT(__func__, __LINE__, fmt, ##__VA_ARGS__);	\
+	unlikely(__ret_warn);						\
 })
 
-#define WARN_ONCE WARN
+#define WARN_ON(cond)							\
+	WARN(cond, "%s\r\n", #cond)
 
-#define WARN_ON(cond) ({						\
-	int __ret_warn_on = !!(cond);				\
-	if (unlikely(__ret_warn_on))					\
-		printf("%s, %d: %s\r\n", __func__, __LINE__, #cond);						\
-	unlikely(__ret_warn_on);					\
+#define WARN_ONCE(cond, fmt, ...) ({					\
+	static bool __warned;						\
+	int __ret_warn = !!(cond);					\
+	if (unlikely(__ret_warn && !__warned)) {			\
+		__warned = true;					\
+		__WARN_PRINT(__func__, __LINE__, fmt, ##__VA_ARGS__);	\
+	}								\
+	unlikely(__ret_warn);						\
 })
 
-#define WARN_ON_ONCE(cond)	WARN_ON(cond)
+#define WARN_ON_ONCE(cond) WARN_ONCE(cond, "%s\r\n", #cond)
 
 #define VM_WARN_ON(cond) WARN_ON(cond)
 

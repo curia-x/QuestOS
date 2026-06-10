@@ -16,7 +16,7 @@
 
 #define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
 
-void mm_early_init(void);
-void mm_post_init(void);
+extern void mm_early_init(void);
+extern void mm_post_init(void);
 
 #endif /* _LINUX_MM_H */
