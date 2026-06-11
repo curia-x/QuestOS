@@ -7,6 +7,9 @@
 #include <linux/string.h>
 #include <uart.h>
 #include <spinlock.h>
+#include <print.h>
+
+enum log_level current_log_level = LOG_INFO;
 
 #define CONSOLE_PRINT_BUFFER_SIZE 1024
 static char g_print_buf[CONSOLE_PRINT_BUFFER_SIZE];
