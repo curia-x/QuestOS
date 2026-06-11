@@ -119,9 +119,9 @@ sched_class:sched round robin
 CPU1: found redistributor 1 region 0:0xFFFFFFFFFF11C000
 CPU2: found redistributor 2 region 0:0xFFFFFFFFFF13C000
 CPU3: found redistributor 3 region 0:0xFFFFFFFFFF15C000
-Load 10 processes
+Loaded 10 user processes
 
-=========Press any key to load user app process=========
+=========Press any key to start user processes=========
 
 cpu[0]: ============= app 1 ============
 cpu[2]: ============= app 3 ============

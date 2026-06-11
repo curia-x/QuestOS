@@ -970,7 +970,7 @@ static void user_processes_init(void)
 		return;
 	}
 
-	pr_notice("Load %d processes\n", count);
+	pr_notice("Loaded %d user processes\n", count);
 
 	user_processes_struct_init();
 }

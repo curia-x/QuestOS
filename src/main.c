@@ -92,7 +92,7 @@ void quest_os_main(void)
 
 	user_process_init();
 
-	pr_notice("\n=========Press any key to load user app process=========\n\n");
+	pr_notice("\n=========Press any key to start user processes=========\n\n");
 	uart_recv();
 
 	user_processes_register();
