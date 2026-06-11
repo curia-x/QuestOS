@@ -49,4 +49,6 @@ void run_idle(void);
 
 void preempt_check_resched(void);
 
+void local_sched_timer_start(void);
+
 #endif /* __SCHED_H__ */

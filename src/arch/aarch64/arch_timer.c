@@ -51,6 +51,10 @@ static int cpuhp_arch_timer_setup(unsigned int cpu, void *data)
 	(void)cpu;
 	(void)data;
 
+	u64 tick_interval = CURRENT_SCHED_CLASS()->get_timeslice();
+
+	arch_timer_start(tick_interval);
+
 	return __arch_timer_init();
 }
 

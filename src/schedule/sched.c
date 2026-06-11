@@ -59,7 +59,6 @@ extern void process_cpu_context_switch(u64 *kernel_sp, phys_addr_t ttbr0);
 
 static void run_process(struct process_struct *proc)
 {
-	// u64 tick_interval = CURRENT_SCHED_CLASS()->get_timeslice();
 	struct kernel_thread *kthread = proc->kthread;
 	u64 ttbr0 = virt_to_phys(proc->mm.pg_dir);
 
@@ -77,9 +76,6 @@ static void run_process(struct process_struct *proc)
 
 	proc->last_run_timestamp = COUNT_TO_NS(arch_counter_get_val());
 
-	// if (tick_interval)
-	// 	arch_timer_start(tick_interval);
-
 	/* We already in idle context, just run idle func. */
 	if (strncmp(proc->name, "idle", 4) == 0)
 		kthread->entry(kthread->arg);
@@ -88,6 +84,13 @@ static void run_process(struct process_struct *proc)
 
 	/* we are back to idle, so set it to PROCESS_RUNNING */
 	current->state = PROCESS_RUNNING;
+}
+
+void local_sched_timer_start(void)
+{
+	u64 tick_interval = CURRENT_SCHED_CLASS()->get_timeslice();
+
+	arch_timer_start(tick_interval);
 }
 
 static void schdule(void)

@@ -95,6 +95,8 @@ void quest_os_main(void)
 
 	user_process_init();
 
+	local_sched_timer_start();
+
 	run_idle();
 
 	unreachable();
