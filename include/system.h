@@ -28,10 +28,10 @@ void record_enter_in_kernel(void);
 
 #define __BUG(cond_str) do {						\
 	const char *__cond_str = (cond_str);					\
-	printf("BUG:%s, %d%s%s\r\n",	\
+	pr_emerg("BUG:%s, %d%s%s\r\n",	\
 			__func__, __LINE__, \
 			__cond_str[0] == '\0' ? "" : ": ", \
-			(cond_str));	\
+			(__cond_str));	\
 	while (1)							\
 		;							\
 } while (0)
@@ -46,7 +46,7 @@ void record_enter_in_kernel(void);
 } while (0)
 
 #define __WARN_PRINT(func, line, fmt, ...)				\
-	printf("WARN:%s, %d: " fmt,				\
+	pr_warn("WARN:%s, %d: " fmt,				\
 	       func, line, ##__VA_ARGS__)
 
 #define WARN(cond, fmt, ...) ({						\
