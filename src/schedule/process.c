@@ -361,10 +361,11 @@ void user_processes_struct_init(void)
 {
 	int err, i;
 	struct process_struct *proc;
-	u64 sp_el0 = PROCESS_STACK_TOP;
+	u64 sp_el0;
 	size_t sp_el0_used;
 
 	for_each_process(proc, i) {
+		sp_el0 = PROCESS_STACK_TOP;
 		err = process_memory_init(proc);
 		if (err) {
 			printf("process %d memory init failed\n", i);
@@ -373,7 +374,7 @@ void user_processes_struct_init(void)
 
 		err = process_stack_init(proc, &sp_el0_used);
 		if (err) {
-			printf("process stack init failed: %d\n", sp_el0_used);
+			printf("process stack init failed: %d\n", err);
 			goto release_mm_resource;
 		}
 
