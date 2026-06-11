@@ -14,6 +14,7 @@
 #include <sched.h>
 #include <percpu.h>
 #include <smp.h>
+#include <psci.h>
 
 #define CACHELINE_SIZE 64
 /*
@@ -43,9 +44,9 @@ void quest_os_main(void)
 
 	mm_post_init();
 
-	smp_init();
-
 	per_cpu_init();
+
+	cpu_init();
 
 	printf("\r\n===============Welcome to Quest OS!===============\r\n");
 
@@ -71,12 +72,30 @@ void quest_os_main(void)
 		goto exit;
 	}
 
-	process_init();
+	ret = kthread_init();
+	if (ret) {
+		printf("kthread init failed, err=%d\n", ret);
+		goto exit;
+	}
 
-	printf("Press any key to start scheduler:\n");
+	ret = psci_init();
+	if (ret) {
+		printf("psci init failed, err=%d\n", ret);
+		goto exit;
+	}
+
+	ret = smp_init();
+	if (ret) {
+		printf("smp init failed, err=%d\n", ret);
+		goto exit;
+	}
+
+	printf("Press any key to schdule user app process\n");
 	uart_recv();
 
-	run_scheduler();
+	user_process_init();
+
+	run_idle();
 
 	unreachable();
 

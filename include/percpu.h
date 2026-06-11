@@ -13,10 +13,13 @@ extern u64 per_cpu_base[MAX_CPUS];
 #define __per_cpu __attribute__((section(".data..percpu")))
 
 #define DEFINE_PER_CPU(type, name) \
-	type __per_cpu name
+	type name __per_cpu
+
+#define DEFINE_PER_CPU_ARRAY(type, name, size) \
+	type name[size] __per_cpu
 
 #define DECLARE_PER_CPU(type, name) \
-	extern type __per_cpu name
+	extern type name __per_cpu
 
 #define per_cpu_ptr(ptr, cpu) \
 	((typeof(*(ptr)) *)((u64)ptr - (u64)__percpu_start + per_cpu_base[cpu]))

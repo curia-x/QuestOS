@@ -29,15 +29,18 @@ void *kmalloc(size_t size, gfp_t flags)
 	phys_addr_t align;
 	struct malloc_mem_region *region;
 
+	if (size == 0)
+		return NULL;
+
 	if (is_power_of_2(size))
 		align = size;
 	else
 		align = 1UL << fls(size);
 
-	size = ALIGN_UP(size, align);
-
 	/* alloc at least 2x size to make sure the returned address can be aligned to size. */
-	pa = memblock_phys_alloc_range(struct_size(region, buf, size << 1), 0, 0, 0);
+	size = ALIGN_UP(size, align) << 1;
+
+	pa = memblock_phys_alloc_range(struct_size(region, buf, size), 0, 0, 0);
 
 	region = phys_to_virt(pa);
 

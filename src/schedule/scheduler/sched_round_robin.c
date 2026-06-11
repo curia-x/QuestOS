@@ -9,35 +9,50 @@
 
 #define TIME_SLICE_NS	(10 * 1000 * 1000) /* 10ms */
 
-static int g_num_processes;
-static struct process_struct *g_processes[MAX_PROCESS_COUNT];
-static int g_next_process;
+DEFINE_PER_CPU(int, g_num_processes);
+DEFINE_PER_CPU_ARRAY(struct process_struct *, g_processes, MAX_PROCESS_COUNT);
+DEFINE_PER_CPU(int, g_next_process);
 
 static struct process_struct *round_robin_pick_next(void)
 {
-	if (!g_num_processes)
+	int *num_processes = this_cpu_ptr(&g_num_processes);
+	int *next_process = this_cpu_ptr(&g_next_process);
+	struct process_struct **processes = this_cpu_ptr(&g_processes[0]);
+
+	// if (get_smp_processor_id() == 1) {
+	// 	printf("num_processes=0x%lx, processes=0x%lx\n", num_processes, processes);
+	// }
+
+	if (!*num_processes)
 		return NULL;
 
-	for (int i = g_next_process, j = 0; j < g_num_processes; i = (i + 1) % g_num_processes, j++) {
-		if (g_processes[i]->state != PROCESS_READY &&
-			g_processes[i]->state != PROCESS_RUNNING)
+	for (int i = *next_process, j = 0; j < *num_processes; i = (i + 1) % *num_processes, j++) {
+		if (processes[i]->state != PROCESS_READY &&
+			processes[i]->state != PROCESS_RUNNING)
 			continue;
-		g_next_process = (i + 1) % g_num_processes;
+		*next_process = (i + 1) % *num_processes;
 
-		return g_processes[i];
+		return processes[i];
 	}
 
 	return NULL;
 }
 
-static int round_robin_load_process(struct process_struct *process)
+static int round_robin_load_process(unsigned int cpu, struct process_struct *process)
 {
+	int *num_processes = per_cpu_ptr(&g_num_processes, cpu);
+	struct process_struct **processes = per_cpu_ptr(&g_processes[0], cpu);
+
 	if (!process)
 		return -EINVAL;
 
 	process->state = PROCESS_READY;
 
-	g_processes[g_num_processes++] = process;
+	process->cpu = cpu;
+
+	processes[*num_processes] = process;
+
+	*num_processes = *num_processes + 1;
 
 	return 0;
 }

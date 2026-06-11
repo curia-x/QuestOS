@@ -42,10 +42,13 @@
 	stp	x28, x29, [sp, #16 * 14]
 
 	.if	\el == 0
-		/* Save user SP before reusing SP_EL0 as current task pointer. */
 		mrs	x21, sp_el0
 		/* struct task_struct *entry_task */
 		ldr x0, =entry_task
+		ldr x1, =__percpu_start
+		sub x0, x0, x1
+		mrs x1, tpidr_el1
+		add x0, x0, x1
 		ldr x1, [x0]
 		msr	sp_el0, x1
 	.else
@@ -100,17 +103,58 @@
 	isb
 	.endm
 
+.macro this_cpu_ptr, var, ptr, tmp
+    ldr \ptr, =\var
+    ldr \tmp, =__percpu_start
+    sub \tmp, \ptr, \tmp
+    mrs \ptr, tpidr_el1
+    add \ptr, \ptr, \tmp
+.endm
+
+/* long / unsigned long / u64 / s64 */
+.macro this_cpu_long, var, res, tmp
+    this_cpu_ptr \var, \res, \tmp
+    ldr \res, [\res]
+.endm
+
+/* signed int / s32 */
+.macro this_cpu_s32, var, res, tmp
+    this_cpu_ptr \var, \res, \tmp
+    ldrsw \res, [\res]
+.endm
+
+/* unsigned int / u32 */
+.macro this_cpu_u32, var, res_x, res_w, tmp
+    this_cpu_ptr \var, \res_x, \tmp
+    ldr \res_w, [\res_x]
+.endm
+
+/* bool/u8: load 1 byte, zero-extend */
+.macro this_cpu_u8, var, ptr, res_w, tmp
+    this_cpu_ptr \var, \ptr, \tmp
+    ldrb \res_w, [\ptr]
+.endm
+
+.macro check_resched
+    this_cpu_long preempt_count, x21, x22
+
+    cmp x21, #0
+    b.gt 1f                  // > 0 禁止调度；<= 0 可以继续检查
+
+    this_cpu_u8 __need_resched, x22, w22, x23
+    cbnz w22, process_resched
+1:
+.endm
+
 SYM_CODE_START_LOCAL(ret_to_kernel)
 	kernel_exit	1
 SYM_CODE_END(ret_to_kernel)
 
 SYM_CODE_START_LOCAL(ret_to_user)
-	ldr x21, =need_resched
-	ldr x22, [x21]
-	cbnz x22, process_resched
 	kernel_exit	0
+SYM_CODE_END(ret_to_user)
 
-process_resched:
+SYM_CODE_START_LOCAL(process_resched)
 	/* backup current kernel sp */
 	mov x21, sp
 	/* load idle sp from current->sp */
@@ -136,8 +180,7 @@ process_resched:
 	ldp x29, x30, [sp], #16
 
 	ret
-
-SYM_CODE_END(ret_to_kernel)
+SYM_CODE_END(process_resched)
 
 	.macro entry_handler, el:req, ht:req, regsize:req, label:req
 SYM_CODE_START_LOCAL(el\el\ht\()_\regsize\()_\label)
@@ -146,6 +189,7 @@ SYM_CODE_START_LOCAL(el\el\ht\()_\regsize\()_\label)
 	mov x0, sp
 	bl	el\el\ht\()_\regsize\()_\label\()_handler
 	msr	daifset, #0xf /* 屏蔽调试异常、SError 异常、IRQ、FIQ  */
+	check_resched
 	.if \el == 0
 		b	ret_to_user
 	.else

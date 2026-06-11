@@ -25,16 +25,16 @@ SYSCALL_DEFINE1(exit, int, error_code)
 
 static ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count)
 {
-	char tmp_buf[128];
+	char buffer[128];
 
-	if (copy_from_user(tmp_buf, buf, count)) {
+	if (copy_from_user(buffer, buf, count)) {
 		printf("%s, copy_from_user failed\n", current->name);
 		return -EFAULT;
 	}
 
-	tmp_buf[count] = '\0';
+	buffer[count] = '\0';
 
-	printf("%s", tmp_buf);
+	printf("cpu[%d]%s", get_smp_processor_id(), buffer);
 
 	return count;
 }

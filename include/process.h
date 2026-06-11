@@ -1,5 +1,4 @@
-
-/* SPDX-License-Identifier: GPL-2.0 */
+// SPDX-License-Identifier: GPL-2.0
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
 
@@ -140,9 +139,16 @@ struct memory_struct {
 	struct pgtable_mem *pgtable_mem;
 };
 
+struct kernel_thread {
+	struct process_struct *process;
+	void (*entry)(void *arg);
+	void *arg;
+};
+
 struct process_struct {
 	u64 sp;
 	char name[PROCESS_MAX_NAME_LEN];
+	unsigned int cpu;
 	int pid;
 	u64 pc;
 	void *kernel_stack;
@@ -150,13 +156,16 @@ struct process_struct {
 	u64 last_run_timestamp;
 	struct process_image image;
 	struct memory_struct mm;
+	struct kernel_thread *kthread;
 	struct process_struct *last_wake;
 	process_state_t state;
 };
 
 extern unsigned long init_stack[THREAD_SIZE / sizeof(unsigned long)];
 
-void process_init(void);
+int kthread_init(void);
+void user_process_init(void);
 extern void kernel_init_task_entry(void);
+struct process_struct *get_idle_process(void);
 
 #endif /* __PROCESS_H__ */

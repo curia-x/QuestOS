@@ -23,6 +23,7 @@
 #include <irq.h>
 #include <smp.h>
 #include <percpu.h>
+#include <cpuhp.h>
 
 #define FLAGS_WORKAROUND_INSECURE		(1ULL << 3)
 
@@ -489,7 +490,7 @@ static void gic_dist_init(void)
 	 * enabled.
 	 */
 	/* 设置默认路由，全都路由到boot cpu */
-	affinity = gic_mpidr_to_affinity(get_mpidr_el1());
+	affinity = gic_mpidr_to_affinity(get_mpidr());
 	for (i = 32; i < GIC_LINE_NR; i++)
 		__raw_writeq(affinity, base + GICD_IROUTER + i * 8);
 
@@ -501,7 +502,7 @@ static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 {
 	u32 aff;
 	u64 typer;
-	u64 mpidr = get_mpidr_el1();
+	u64 mpidr = get_mpidr();
 	int cpu = mpidr_to_processor_id(mpidr);
 
 	aff = gic_mpidr_to_affinity(mpidr);
@@ -516,7 +517,7 @@ static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 		printf("CPU%d: found redistributor %lx region %d:0x%p\n",
 			cpu, mpidr,
 			(int)(region - gic_data.redist_regions),
-			&gic_data_rdist()->phys_base);
+			gic_data_rdist_rd_base());
 		return 0;
 	}
 
@@ -526,7 +527,7 @@ static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 
 static int gic_populate_rdist(void)
 {
-	u64 mpidr = get_mpidr_el1();
+	u64 mpidr = get_mpidr();
 
 	if (gic_iterate_rdists(__gic_populate_rdist) == 0)
 		return 0;
@@ -607,7 +608,7 @@ static void gic_cpu_sys_reg_init(void)
 {
 	int i;
 	int cpu;
-	int mpidr = get_mpidr_el1();
+	u64 mpidr = get_mpidr();
 	u64 need_rss = MPIDR_RS(mpidr);
 	bool group0;
 	u32 pribits;
@@ -828,6 +829,16 @@ static struct irq_chip gic_v3_chip = {
 	.irq_mask = gic_v3_irq_mask,
 };
 
+static int gic_starting_cpu(unsigned int cpu, void *data)
+{
+	(void)data;
+
+	gic_cpu_sys_reg_enable();
+	gic_cpu_init();
+
+	return 0;
+}
+
 int gic_v3_init(void)
 {
 	int ret;
@@ -863,6 +874,12 @@ int gic_v3_init(void)
 	ret = irq_chip_register(&gic_v3_chip);
 	if (ret)
 		return ret;
+
+	ret = cpuhp_state_register(CPUHP_INIT_GIC, "gic_v3_starting", gic_starting_cpu, NULL);
+	if (ret) {
+		printf("Failed to register GICv3 starting CPU handler: %d\n", ret);
+		return ret;
+	}
 
 	printf("gic-v3 init success.\n");
 

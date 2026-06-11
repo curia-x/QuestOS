@@ -100,6 +100,10 @@ SECTIONS
         . = __start_init_stack + THREAD_SIZE;
         __end_init_stack = .;
 
+        __percpu_start = .;
+        KEEP(*(.data..percpu))
+        __percpu_end = .;
+
         *(.data .data.*)
     }
     . = ALIGN(PAGE_SIZE);
@@ -121,13 +125,6 @@ SECTIONS
     __relocate_copy_end = .;
 
     . = ALIGN(PAGE_SIZE);
-
-    __percpu_start = .;
-    .data..percpu : ALIGN(8) {
-        *(.data..percpu)
-    }
-    . = ALIGN(PAGE_SIZE);
-    __percpu_end = .;
 
     __bss_start = .;
     .bss  : { *(.bss .bss.*) *(COMMON) }

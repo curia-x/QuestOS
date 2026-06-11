@@ -3,7 +3,7 @@
 
 ROOTFS_PATH=/home/book/qemu_resource/rootfs_aarch64
 KERNEL_IMAGE_PATH=/home/book/source_code/linux/arch/arm64/boot/Image
-DTB_PATH=/home/book/qemu_resource/arm64/cortex-a72_gicv3.dtb
+DTB_PATH=/home/book/qemu_resource/cortex-a72_gicv3_smp_4.dtb
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Re-running script as root..."
@@ -66,7 +66,7 @@ set -- \
             -M virt,virtualization=false,secure=off,gic-version=3,its=on \
             -m size=1024M \
             -cpu cortex-a72,pmu=on \
-            -smp 1 \
+            -smp 4 \
             -bios $BIOS \
             -dtb $DTB_PATH \
             -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \

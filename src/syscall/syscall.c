@@ -15,5 +15,5 @@ void el0t_64_handle_svc(struct pt_regs *regs)
 	regs->regs[0] = syscall_fn(regs);
 
 	if (current->state != PROCESS_RUNNING)
-		set_resched();
+		set_resched(true);
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <asm/sysreg.h>
 #include <asm/sysreg-defs.h>
-#include <generated/asm-offsets.h>
+#include <asm/generated/asm-offsets.h>
 #include <linkage.h>
 #include <pgtable-hwdef.h>
 #include <cfi_types.h>
@@ -191,15 +191,12 @@ SYM_FUNC_START(__cpu_setup)
 	 * below depending on detected CPU features.
 	 */
 	mair	.req	x17
-	tcr	.req	x16
-	tcr2	.req	x15
+	tcr		.req	x16
 	mov_q	mair, MAIR_EL1_SET
 	mov_q	tcr, TCR_T0SZ(IDMAP_VA_BITS) | TCR_T1SZ(IDMAP_VA_BITS) | TCR_CACHE_FLAGS | \
 		     TCR_SHARED | TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
 		     TCR_TBI0 | TCR_A1 | TCR_KASAN_SW_FLAGS | TCR_MTE_FLAGS | TCR_IPS_48BIT
-	mov	tcr2, xzr
 
-#ifdef CONFIG_ARM64_HW_AFDBM
 	/*
 	 * Enable hardware update of the Access Flags bit.
 	 * Hardware dirty bit management is enabled later,
@@ -209,34 +206,9 @@ SYM_FUNC_START(__cpu_setup)
 	ubfx	x9, x9, ID_AA64MMFR1_EL1_HAFDBS_SHIFT, #4
 	cbz	x9, 1f
 	orr	tcr, tcr, #TCR_HA		// hardware Access flag update
-#ifdef CONFIG_ARM64_HAFT
-	cmp	x9, ID_AA64MMFR1_EL1_HAFDBS_HAFT
-	b.lt	1f
-	orr	tcr2, tcr2, TCR2_EL1_HAFT
-#endif /* CONFIG_ARM64_HAFT */
 1:
-#endif	/* CONFIG_ARM64_HW_AFDBM */
 	msr	mair_el1, mair
 	msr	tcr_el1, tcr
-
-	mrs_s	x1, SYS_ID_AA64MMFR3_EL1
-	ubfx	x1, x1, #ID_AA64MMFR3_EL1_S1PIE_SHIFT, #4
-	cbz	x1, .Lskip_indirection
-
-	mov_q	x0, PIE_E0_ASM
-	msr	REG_PIRE0_EL1, x0
-	mov_q	x0, PIE_E1_ASM
-	msr	REG_PIR_EL1, x0
-
-	orr	tcr2, tcr2, TCR2_EL1_PIE
-
-.Lskip_indirection:
-
-	mrs_s	x1, SYS_ID_AA64MMFR3_EL1
-	ubfx	x1, x1, #ID_AA64MMFR3_EL1_TCRX_SHIFT, #4
-	cbz	x1, 1f
-	msr	REG_TCR2_EL1, tcr2
-1:
 
 	/*
 	 * Prepare SCTLR
@@ -246,28 +218,27 @@ SYM_FUNC_START(__cpu_setup)
 
 	.unreq	mair
 	.unreq	tcr
-	.unreq	tcr2
 SYM_FUNC_END(__cpu_setup)
 
 SYM_FUNC_START_LOCAL(__primary_switch)
 	adrp	x1, reserved_pg_dir
 	adrp	x2, __pi_init_idmap_pg_dir
 	/* 配置ttbr_el0/ttbr_el1, 打开mmu */
-	bl	__enable_mmu
+	bl		__enable_mmu
 
 	adrp	x1, early_init_stack
-	mov	sp, x1
-	mov	x29, xzr	// 把 frame pointer 置空，表示“这里是调用栈的根，没有上一级帧”。
-	mov	x0, x20				// pass the full boot status
-	mov	x1, x21				// pass the FDT
-	bl	early_map_kernel		// Map and relocate the kernel
+	mov		sp, x1
+	mov		x29, xzr	// 把 frame pointer 置空，表示“这里是调用栈的根，没有上一级帧”。
+	mov		x0, x20				// pass the full boot status
+	mov		x1, x21				// pass the FDT
+	bl		early_map_kernel		// Map and relocate the kernel
 
 	// 如果打开了CONFIG_RELOCATABLE, 那__primary_switched已经重定位成正确的地址，
 	// 因此不会出错
-	ldr	x8, =__primary_switched
-	adr	x0, _stext		// __pa(_start)
+	ldr		x8, =__primary_switched
+	adr		x0, _stext		// __pa(_start)
 
-	br	x8
+	br		x8
 SYM_FUNC_END(__primary_switch)
 
 SYM_FUNC_START(__enable_mmu)
@@ -277,7 +248,7 @@ SYM_FUNC_START(__enable_mmu)
 	b.lt    proc_hang
 	cmp     x3, #ID_AA64MMFR0_EL1_TGRAN_SUPPORTED_MAX
 	b.gt    proc_hang
-	msr	ttbr0_el1, x2			// load TTBR0
+	msr		ttbr0_el1, x2			// load TTBR0
 	msr		ttbr1_el1, x1
 	isb
 
@@ -287,6 +258,44 @@ SYM_FUNC_START(__enable_mmu)
 SYM_FUNC_END(__enable_mmu)
 
 .section	".init.text","ax"
+
+/*
+ * x0: init process
+ * x1: C entry
+ */
+SYM_FUNC_START_LOCAL(load_init_task)
+	/* current = x0 */
+	msr sp_el0, x0
+
+	/* process->pc = x1 */
+	str x1, [x0, #PROCESS_PC_OFFS]
+	mov x30, x1
+
+	/*
+	 * x1 = process->kernel_stack
+	 * x2 = process->kernel_stack_size
+	 */
+	ldp x1, x2, [x0, #PROCESS_KERNEL_STACK_OFFS]
+
+	/*
+	 * process->sp = (u64)process->kernel_stack +
+	 *				process->kernel_stack_size - sizeof(struct user_pt_regs);
+	 * process->sp &= ~0xfUL;
+	 */
+	add x1, x1, x2
+	sub x1, x1, #USER_PT_REGS_SIZE
+	bic x1, x1, #0xf
+	mov sp, x1
+	str x1, [x0, #PROCESS_SP_OFFS]
+
+	adr_l	x8, exception_vector_table			// load VBAR_EL1 with virtual
+	msr	vbar_el1, x8			// vector table address
+	isb
+
+	mov x29, xzr
+
+	ret
+SYM_FUNC_END(load_init_task)
 /*
  * The following fragment of code is executed with the MMU enabled.
  *
@@ -297,26 +306,15 @@ SYM_FUNC_START_LOCAL(__primary_switched)
 	sub		x4, x4, x0			// the kernel virtual and
 	str_l	x4, kimage_voffset, x5		// physical mappings
 
-	b	switch_to_kernel_init_task
-SYM_FUNC_END(__primary_switched)
-
-SYM_FUNC_START(kernel_init_task_entry)
-	adr_l	x8, exception_vector_table			// load VBAR_EL1 with virtual
-	msr	vbar_el1, x8			// vector table address
-	isb
-
-	stp	x29, x30, [sp, #-16]!
-	mov	x29, sp
-
 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
 
 	mov	x0, x20
 	bl	set_cpu_boot_mode_flag
 
-	ldp	x29, x30, [sp], #16
-	bl	quest_os_main
-	b proc_hang
-SYM_FUNC_END(kernel_init_task_entry)
+	ldr x0, =g_kernel_init_process
+	ldr x1, =quest_os_main
+	b load_init_task
+SYM_FUNC_END(__primary_switched)
 
 /*
  * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
@@ -350,6 +348,48 @@ SYM_TYPED_FUNC_START(idmap_cpu_replace_ttbr1)
 
 	ret
 SYM_FUNC_END(idmap_cpu_replace_ttbr1)
+
+.section	".init.text","ax"
+SYM_FUNC_START_LOCAL(__secondary_switched)
+	mrs x0, mpidr_el1
+	bic	x0, x0, #(0xff << 24)
+	bl mpidr_to_processor_id
+
+	cmp w0, #0
+	b.lt proc_hang
+
+	ldr x1, =per_cpu_base
+	ldr x0, [x1, w0, uxtw #3]	// per_cpu_base[cpu]
+
+	ldr	x1, =idle_process
+	ldr x2, =__percpu_start
+	sub x1, x1, x2
+	add	x0, x0, x1
+	ldr x0, [x0] // idle process
+	ldr x1, =cpuhp_init_to_online
+	b load_init_task
+SYM_FUNC_END(__secondary_switched)
+
+.section ".idmap.text","ax"
+SYM_FUNC_START(secondary_entry)
+	mov		x0, xzr
+	bl		init_kernel_el			// w0=cpu_boot_mode
+
+	bl		__cpu_setup
+
+	adrp	x1, swapper_pg_dir
+	adrp	x2, __pi_init_idmap_pg_dir
+	/* 配置ttbr_el0/ttbr_el1, 打开mmu */
+	bl		__enable_mmu
+
+	adrp	x1, early_init_stack
+	mov		sp, x1
+	mov		x29, xzr	// 把 frame pointer 置空，表示“这里是调用栈的根，没有上一级帧”。
+
+	ldr		x8, =__secondary_switched
+
+	br		x8
+SYM_FUNC_END(secondary_entry)
 
 proc_hang:
 	b proc_hang

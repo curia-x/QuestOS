@@ -36,6 +36,9 @@ SYM_FUNC_START(process_cpu_context_switch)
 	ldp	x26, x27, [sp, #16 * 13]
 	ldp	x28, x29, [sp, #16 * 14]
 
+	cbz	x1, 1f
+
+	/* switch to user process */
 	/* Ensure new page tables are visible before installing TTBR0 */
 	dsb	ishst
 
@@ -47,10 +50,16 @@ SYM_FUNC_START(process_cpu_context_switch)
 	dsb		ish
 	isb
 
-	/* Restore x30 and user SP */
-	ldp	x0, x1, [sp, #16 * 15]
-	mov	x30, x0
-	msr	sp_el0, x1
+1:
+	ldp	x2, x3, [sp, #16 * 15]
+
+	/* Restore lr/x30 */
+	mov	x30, x2
+
+	/* Kernel thread use sp_el0 as current. */
+	/* User process use sp_el0 as stack pointer. */
+	/* Restore sp_el0 */
+	msr	sp_el0, x3
 
 	/* Restore exception return state */
 	ldp	x0, x1, [sp, #16 * 16]

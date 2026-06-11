@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/types.h>
 #include <linux/errno.h>
+#include <linux/string.h>
 #include <uapi/linux/elf.h>
 #include <linker_symbol.h>
 #include <print.h>
@@ -11,20 +12,35 @@
 #include <memory.h>
 #include <pg_table.h>
 #include <string.h>
+#include <current.h>
+#include <percpu.h>
+#include <cpuhp.h>
+
+extern struct process_struct g_kernel_init_process;
+
+struct kernel_thread g_init_idle_thread0 = {
+	.process = &g_kernel_init_process,
+	.arg = &g_init_idle_thread0,
+};
 
 struct process_struct g_kernel_init_process = {
-	.name = "idle",
+	.sp = (u64)&g_kernel_init_process,
+	.name = "idle0",
+	.cpu = 0,
 	.pid = 0,
+	.kthread = &g_init_idle_thread0,
 	.mm.pg_dir = swapper_pg_dir,
 	.kernel_stack = init_stack,
 	.kernel_stack_size = THREAD_SIZE,
 };
 
+DEFINE_PER_CPU(struct process_struct *, idle_process);
+
 static struct process_struct *g_processes[PROCESS_MAX_COUNT];
-static int g_num_processes;
+static int g_processes_count;
 
 #define for_each_process(proc, idx) \
-	for ((idx) = 0, (proc) = g_processes[0]; (idx) < g_num_processes; ++(idx), (proc) = g_processes[idx])
+	for ((idx) = 0, (proc) = g_processes[0]; (idx) < g_processes_count; ++(idx), (proc) = g_processes[idx])
 
 static int max_pid = 1;
 
@@ -105,6 +121,10 @@ static int process_map_segments(struct memory_struct *mm)
 
 static inline int process_map_stack(struct memory_struct *mm)
 {
+	printf("PROCESS_STACK_TOP:0x%llx\n", PROCESS_STACK_TOP);
+	printf("user stack size:0x%llx\n", mm->stack_size);
+	printf("user stack size:0x%llx\n", mm->stack_size);
+	printf("stack kaddr:0x%llx\n", mm->stack);
 	return process_map_rw(mm, virt_to_phys((void *)mm->stack),
 					PROCESS_STACK_TOP - mm->stack_size, mm->stack_size);
 }
@@ -115,33 +135,105 @@ static inline int process_map_meta(struct process_struct *proc)
 					PROCESS_META_START, PAGE_ALIGN_UP(proc->image.meta_size));
 }
 
-static u32 process_stack_init(struct process_struct *proc)
+#define SP_ALIGN_BYTES	16U
+#define SIZE_OF_ARGC	sizeof(long)
+#define SIZE_OF_PTR		sizeof(uintptr_t)
+#define SIZE_OF_AUXV	sizeof(struct proc_auxv_entry)
+
+static size_t calculate_stack_meta_size(struct process_image *img)
+{
+	size_t size = 0;
+
+	size += SIZE_OF_ARGC + SIZE_OF_PTR * (img->argc + 1);
+	size += SIZE_OF_PTR * (img->env_count + 1);
+	size += SIZE_OF_AUXV * (img->auxv_count);
+
+	size = ALIGN_UP(size, SP_ALIGN_BYTES);
+
+	return size;
+}
+
+static uintptr_t meta_to_user_addr(const char *meta_base, const char *p)
+{
+	return (uintptr_t)(p - meta_base + PROCESS_META_START);
+}
+
+static int process_stack_init(struct process_struct *proc, size_t *stack_used_size)
 {
 	struct memory_struct *mm = &proc->mm;
 	struct process_image *img = &proc->image;
-	void *sp_top = mm->stack + mm->stack_size;
-	void *current_sp = sp_top;
-	char *meta_base = img->meta_data;
+	char *sp_top = (char *)mm->stack + mm->stack_size;
+	size_t used_size;
+	char *current_sp;
+	const char *meta_base = img->meta_data;
 
-	for (int i = img->auxv_count - 1; i >= 0; i--) {
-		current_sp -= sizeof(struct proc_auxv_entry);
-		memcpy(current_sp, img->auxv[i], sizeof(struct proc_auxv_entry));
+	BUG_ON(!IS_ALIGNED((uintptr_t)sp_top, SP_ALIGN_BYTES));
+
+	if (!stack_used_size)
+		return -EINVAL;
+
+	used_size = calculate_stack_meta_size(img);
+
+	if (used_size > mm->stack_size)
+		return -ENOMEM;
+
+	current_sp = sp_top - used_size;
+
+	/* argc */
+	*(long *)current_sp = img->argc;
+	current_sp += SIZE_OF_ARGC;
+
+	/* argv */
+	for (int i = 0; i < img->argc; i++) {
+		*(uintptr_t *)current_sp = meta_to_user_addr(meta_base, img->argv[i]);
+		current_sp += SIZE_OF_PTR;
+	}
+	*(uintptr_t *)current_sp = (uintptr_t)NULL;
+	current_sp += SIZE_OF_PTR;
+
+	/* env */
+	for (int i = 0; i < img->env_count; i++) {
+		*(uintptr_t *)current_sp = meta_to_user_addr(meta_base, img->env[i]);
+		current_sp += SIZE_OF_PTR;
+	}
+	*(uintptr_t *)current_sp = (uintptr_t)NULL;
+	current_sp += SIZE_OF_PTR;
+
+	/* auxv */
+	for (int i = 0; i < img->auxv_count; i++) {
+		memcpy(current_sp, img->auxv[i], SIZE_OF_AUXV);
+		current_sp += SIZE_OF_AUXV;
 	}
 
-	for (int i = img->env_count - 1; i >= 0; i--) {
-		current_sp -= sizeof(char *);
-		*(char *)current_sp = img->env[i] - meta_base + PROCESS_META_START;
-	}
+	BUG_ON(current_sp > sp_top);
 
-	for (int i = img->argc - 1; i >= 0; i--) {
-		current_sp -= sizeof(char *);
-		*(char *)current_sp = img->argv[i] - meta_base + PROCESS_META_START;
-	}
+	/* fill padding bytes with zero */
+	if (current_sp < sp_top)
+		memset(current_sp, 0, sp_top - current_sp);
 
-	current_sp -= sizeof(u32);
-	*(u32 *)current_sp = img->argc;
+	*stack_used_size = used_size;
 
-	return sp_top - current_sp;
+	return 0;
+
+	// for (int i = img->auxv_count - 1; i >= 0; i--) {
+	// 	current_sp -= sizeof(struct proc_auxv_entry);
+	// 	memcpy(current_sp, img->auxv[i], sizeof(struct proc_auxv_entry));
+	// }
+
+	// for (int i = img->env_count - 1; i >= 0; i--) {
+	// 	current_sp -= sizeof(char *);
+	// 	*(char *)current_sp = img->env[i] - meta_base + PROCESS_META_START;
+	// }
+
+	// for (int i = img->argc - 1; i >= 0; i--) {
+	// 	current_sp -= sizeof(char *);
+	// 	*(char *)current_sp = img->argv[i] - meta_base + PROCESS_META_START;
+	// }
+
+	// current_sp -= sizeof(u32);
+	// *(u32 *)current_sp = img->argc;
+
+	// return sp_top - current_sp;
 }
 
 static int process_memory_init(struct process_struct *proc)
@@ -159,11 +251,16 @@ static int process_memory_init(struct process_struct *proc)
 		stack_size = PROCESS_DEFAULT_STACK_SIZE;
 	}
 
+	printf("process statck size:%llu\n", stack_size);
+
 	mm->stack = kmalloc(stack_size, __GFP_ZERO);
 	if (!mm->stack) {
 		printf("process stack alloc failed\n");
 		return -ENOMEM;
 	}
+	mm->stack = (void *)ALIGN_UP(mm->stack, PAGE_SIZE);
+
+	printf("stack:0x%lx\n", mm->stack);
 	mm->stack_size = stack_size;
 
 	mm->heap = kmalloc(PROCESS_DEFAULT_HEAP_SIZE, __GFP_ZERO);
@@ -230,17 +327,17 @@ void process_destroy(struct process_struct *proc)
 
 	kfree(proc);
 
-	for (i = 0; i < g_num_processes; i++) {
+	for (i = 0; i < g_processes_count; i++) {
 		if (g_processes[i] != proc)
 			continue;
 
-		while (i < (g_num_processes - 1)) {
+		while (i < (g_processes_count - 1)) {
 			g_processes[i] = g_processes[i + 1];
 			++i;
 		}
 	}
 
-	g_num_processes--;
+	g_processes_count--;
 }
 
 #include <system_reg.h>
@@ -265,28 +362,42 @@ void user_processes_struct_init(void)
 	int err, i;
 	struct process_struct *proc;
 	u64 sp_el0 = PROCESS_STACK_TOP;
+	size_t sp_el0_used;
 
 	for_each_process(proc, i) {
 		err = process_memory_init(proc);
 		if (err) {
 			printf("process %d memory init failed\n", i);
-			process_destroy(proc);
+			goto destory_process;
 		}
+
+		err = process_stack_init(proc, &sp_el0_used);
+		if (err) {
+			printf("process stack init failed: %d\n", sp_el0_used);
+			goto release_mm_resource;
+		}
+
+		sp_el0 -= sp_el0_used;
 
 		proc->kernel_stack = kzalloc(PROCESS_DEFAULT_KERNEL_STACK_SIZE, 0);
 		if (!proc->kernel_stack) {
+			err = -ENOMEM;
 			printf("process %d kernel stack alloc failed\n", i);
-			memset(proc->mm.pg_dir, 0, PAGE_SIZE);
-			kfree(proc->mm.heap);
-			kfree(proc->mm.stack);
-			process_destroy(proc);
+			goto release_mm_resource;
 		}
-
-		sp_el0 -= process_stack_init(proc);
 
 		process_calculate_init_regval(proc, sp_el0);
 
 		proc->pid = max_pid++;
+
+		continue;
+
+release_mm_resource:
+		memset(proc->mm.pg_dir, 0, PAGE_SIZE);
+		kfree(proc->mm.heap);
+		kfree(proc->mm.stack);
+destory_process:
+		process_destroy(proc);
 	}
 }
 
@@ -483,7 +594,7 @@ static int check_section_region_valid(struct process_struct *process, Elf64_Phdr
 
 static inline void process_add_to_global(struct process_struct *process)
 {
-	g_processes[g_num_processes++] = process;
+	g_processes[g_processes_count++] = process;
 }
 
 static int load_user_elf(void *elf_base, u64 elf_size, struct process_struct **out_process)
@@ -839,7 +950,7 @@ static int load_processes(void)
 	image_count = header->image_count;
 
 	for (int i = 0; i < image_count; i++) {
-		if (g_num_processes >= PROCESS_MAX_COUNT) {
+		if (g_processes_count >= PROCESS_MAX_COUNT) {
 			printf("process count exceed the limit:%d\n", PROCESS_MAX_COUNT);
 			break;
 		}
@@ -860,8 +971,8 @@ static void user_processes_register(void)
 {
 	int err;
 
-	for (int i = 0; i < g_num_processes; i++) {
-		err = sched_register_process(g_processes[i]);
+	for (int i = 0; i < g_processes_count; i++) {
+		err = sched_register_process(i, g_processes[i]);
 		if (err)
 			printf("process %d register failed\n", i);
 	}
@@ -877,24 +988,83 @@ static void user_processes_init(void)
 		return;
 	}
 
-	g_num_processes = count;
-
 	printf("Load %d processes\n", count);
 
 	user_processes_struct_init();
 	user_processes_register();
 }
 
-void process_init(void)
+void user_process_init(void)
 {
 	user_processes_init();
 }
 
-void __noreturn __init switch_to_kernel_init_task(void)
+static int idle_thread_create(unsigned int cpu, void *data)
 {
-	struct process_struct *process = &g_kernel_init_process;
+	(void)data;
 
-	process->pc = (u64)kernel_init_task_entry;
+	void *kernel_stack;
+	struct process_struct *idle;
+	struct kernel_thread *kthread;
+
+	idle = kmalloc(sizeof(struct process_struct), 0);
+	if (!idle) {
+		printf("idle process alloc failed for cpu%d\n", cpu);
+		return -ENOMEM;
+	}
+
+	kthread = kmalloc(sizeof(struct kernel_thread), 0);
+	if (!kthread) {
+		printf("idle kernel_thread alloc failed for cpu%d\n", cpu);
+		kfree(idle);
+		return -ENOMEM;
+	}
+
+	kernel_stack = kmalloc(THREAD_SIZE, 0);
+	if (!kernel_stack) {
+		printf("idle kernel stack alloc failed for cpu%d\n", cpu);
+		kfree(idle);
+		return -ENOMEM;
+	}
+
+	memcpy(kthread, &g_init_idle_thread0, sizeof(struct kernel_thread));
+	memcpy(idle, &g_kernel_init_process, sizeof(struct process_struct));
+
+	kthread->arg = kthread;
+	kthread->process = idle;
+	idle->kthread = kthread;
+	idle->sp = (u64)idle;
+	idle->kernel_stack = kernel_stack;
+	idle->pid = 0;
+	idle->cpu = cpu;
+	idle->name[4] = '0' + cpu; /* set name to idle1, idle2, ... */
+	per_cpu(idle_process, cpu) = idle;
+
+	printf("idle=0x%x, cpu=%u\n", idle, cpu);
+
+	return 0;
+}
+
+/* Create idle threads for each CPU. */
+int kthread_init(void)
+{
+	/* Setup bootcpu idle process. */
+	this_cpu_write(idle_process, &g_kernel_init_process);
+
+	cpuhp_state_register(CPUHP_CREATE_IDLE, "idle_thread_create",
+					idle_thread_create, NULL);
+
+	return 0;
+}
+
+struct process_struct *get_idle_process(void)
+{
+	return this_cpu_read(idle_process);
+}
+
+void __noreturn __init __switch_to_kernel_init_task(struct process_struct *process, void *ret)
+{
+	process->pc = (u64)ret;
 	process->sp = (u64)process->kernel_stack + process->kernel_stack_size - sizeof(struct user_pt_regs);
 	process->sp &= ~0xfUL;
 
@@ -910,4 +1080,11 @@ void __noreturn __init switch_to_kernel_init_task(void)
 	);
 
 	unreachable();
+}
+
+void __noreturn __init switch_to_kernel_init_task(void *ret)
+{
+	struct process_struct *process = this_cpu_read(idle_process);
+
+	__switch_to_kernel_init_task(process, ret);
 }
