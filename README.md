@@ -110,8 +110,7 @@ debug
 ## 运行日志
 
 下面是一次在 QEMU `virt` 上启动 `build/quest_os_pack_all.bin` 并选择
-Quest OS 路径后的串口输出节选。部分装载调试输出和重复的用户态 demo 输出已
-裁剪:
+Quest OS 路径后的串口输出节选。重复的用户态 demo 输出已裁剪:
 
 ```sh
 timeout 10s bash -c '{ sleep 1; printf q; sleep 1; printf x; } | qemu-system-aarch64 \
@@ -134,16 +133,11 @@ Please select boot option:
 q
 Booting Quest OS...
 fixmap_remap_fdt success
-PERCPU_SIZE:0x444, ffff800000054000 - ffff800000054444
-per_cpu[0]:0xffff00003fffe710 - 0xffff00003fffeb54
-per_cpu[1]:0xffff00003fffd6d0 - 0xffff00003fffdb14
-per_cpu[2]:0xffff00003fffc690 - 0xffff00003fffcad4
-per_cpu[3]:0xffff00003fffb650 - 0xffff00003fffba94
+per_cpu init success.
 
 ===============Welcome to Quest OS!===============
 256 SPIs implemented
 0 Extended SPIs implemented
-Root IRQ handler: 0xFFFF800000005C40
 GICv3 features: 16 PPIs
 GICD_CTLR.DS=1, SCR_EL3.FIQ=0
 CPU0: found redistributor 0 region 0:0xFFFFFFFFFF0FC000
@@ -151,27 +145,29 @@ gic-v3 init success.
 Arch timer freq:62500000 HZ
 Arch timer resolution:16 ns
 sched_class:sched round robin
-idle=0x3fff9610, cpu=1
 CPU1: found redistributor 1 region 0:0xFFFFFFFFFF11C000
-idle=0x3ffef510, cpu=2
 CPU2: found redistributor 2 region 0:0xFFFFFFFFFF13C000
-idle=0x3ffe5410, cpu=3
 CPU3: found redistributor 3 region 0:0xFFFFFFFFFF15C000
-Press any key to schdule user app process
-desc_offset:0x20, desc_size:0xe0, index:0
-desc_offset:0x20, desc_size:0xe0, index:1
-desc_offset:0x20, desc_size:0xe0, index:2
-desc_offset:0x20, desc_size:0xe0, index:3
-Load 4 processes
+Load 10 processes
+
+=========Press any key to load user app process=========
+
+cpu[0]: ============= app 1 ============
+cpu[2]: ============= app 3 ============
+cpu[3]: ============= app 4 ============
+cpu[1]: ============= app 2 ============
+cpu[3]: app 4 running ...
+cpu[2]: app 3 running ...
+cpu[1]: app 2 running ...
+cpu[3]: ============= app 8 ============
+cpu[0]: ============= app 5 ============
+cpu[2]: ============= app 7 ============
+cpu[1]: ============= app 6 ============
+cpu[0]: ============= app 9 ============
+cpu[1]: ============= app 10 ============
 ...
-cpu[3]============= app 4 ============
-cpu[1]============= app 2 ============
-cpu[0]============= app 1 ============
-cpu[2]============= app 3 ============
-cpu[3]app 4 running ...
-cpu[0]app 1 running ...
-cpu[1]app 2 running ...
-cpu[2]app 3 running ...
+cpu[0]: app 9 running ...
+cpu[1]: app 10 running ...
 ...
 ```
 
@@ -212,7 +208,8 @@ app/config/app-config.toml
 ```
 
 `app/tools/proc_pack.py` 会根据配置把 demo ELF 文件打包成 process package，
-再通过 `objcopy` 转换成 AArch64 ELF 对象，最终链接进组合镜像。
+再通过 `objcopy` 转换成 AArch64 ELF 对象，最终链接进组合镜像。当前默认
+配置会打包 `app1` 到 `app10`，用于验证进程数量多于 CPU 数量时的调度路径。
 
 ## 目录结构
 
