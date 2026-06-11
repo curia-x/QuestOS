@@ -973,7 +973,12 @@ static void user_processes_register(void)
 	int err;
 
 	for (int i = 0; i < g_processes_count; i++) {
-		err = sched_register_process(i, g_processes[i]);
+		/*
+		 * TODO: Register processes only on online CPUs.
+		 * All MAX_CPUS CPUs are brought up by default for now,
+		 * so this is not a functional issue.
+		 */
+		err = sched_register_process(i % MAX_CPUS, g_processes[i]);
 		if (err)
 			printf("process %d register failed\n", i);
 	}
