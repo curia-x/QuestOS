@@ -2,7 +2,7 @@
 
 Quest OS 是一个实验性的 AArch64 Linux-like kernel bringup 项目。它对照
 Linux 的实现思路，在 QEMU `virt` 平台上实现从早期启动、MMU、设备树、中断、
-调度、系统调用到 EL0 用户态 demo 的完整运行路径。
+SMP、调度、系统调用到 EL0 用户态 demo 的完整运行路径。
 
 仓库同时包含 QLoader 组件。QLoader 可以作为 QEMU 的 `-bios` 镜像启动，完成
 早期平台初始化，并在串口菜单中选择启动 Linux 或进入 Quest OS 路径。
@@ -110,14 +110,15 @@ debug
 ## 运行日志
 
 下面是一次在 QEMU `virt` 上启动 `build/quest_os_pack_all.bin` 并选择
-Quest OS 路径后的串口输出节选。重复的用户态 demo 输出已裁剪:
+Quest OS 路径后的串口输出节选。部分装载调试输出和重复的用户态 demo 输出已
+裁剪:
 
 ```sh
 timeout 10s bash -c '{ sleep 1; printf q; sleep 1; printf x; } | qemu-system-aarch64 \
   -M virt,virtualization=false,secure=off,gic-version=3,its=on \
   -m size=1024M \
   -cpu cortex-a72,pmu=on \
-  -smp 1 \
+  -smp 4 \
   -bios build/quest_os_pack_all.bin \
   -nographic'
 ```
@@ -133,26 +134,44 @@ Please select boot option:
 q
 Booting Quest OS...
 fixmap_remap_fdt success
+PERCPU_SIZE:0x444, ffff800000054000 - ffff800000054444
+per_cpu[0]:0xffff00003fffe710 - 0xffff00003fffeb54
+per_cpu[1]:0xffff00003fffd6d0 - 0xffff00003fffdb14
+per_cpu[2]:0xffff00003fffc690 - 0xffff00003fffcad4
+per_cpu[3]:0xffff00003fffb650 - 0xffff00003fffba94
 
 ===============Welcome to Quest OS!===============
 256 SPIs implemented
 0 Extended SPIs implemented
-Root IRQ handler: 0xFFFF800000006558
+Root IRQ handler: 0xFFFF800000005C40
 GICv3 features: 16 PPIs
+GICD_CTLR.DS=1, SCR_EL3.FIQ=0
+CPU0: found redistributor 0 region 0:0xFFFFFFFFFF0FC000
 gic-v3 init success.
 Arch timer freq:62500000 HZ
 Arch timer resolution:16 ns
 sched_class:sched round robin
-Load 2 processes
-Press any key to start scheduler:
-============= app 1 ============
-app 1 running ...
+idle=0x3fff9610, cpu=1
+CPU1: found redistributor 1 region 0:0xFFFFFFFFFF11C000
+idle=0x3ffef510, cpu=2
+CPU2: found redistributor 2 region 0:0xFFFFFFFFFF13C000
+idle=0x3ffe5410, cpu=3
+CPU3: found redistributor 3 region 0:0xFFFFFFFFFF15C000
+Press any key to schdule user app process
+desc_offset:0x20, desc_size:0xe0, index:0
+desc_offset:0x20, desc_size:0xe0, index:1
+desc_offset:0x20, desc_size:0xe0, index:2
+desc_offset:0x20, desc_size:0xe0, index:3
+Load 4 processes
 ...
-============= app 2 ============
-app 1 running ...
-app 2 running ...
-app 1 running ...
-app 2 running ...
+cpu[3]============= app 4 ============
+cpu[1]============= app 2 ============
+cpu[0]============= app 1 ============
+cpu[2]============= app 3 ============
+cpu[3]app 4 running ...
+cpu[0]app 1 running ...
+cpu[1]app 2 running ...
+cpu[2]app 3 running ...
 ...
 ```
 
