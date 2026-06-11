@@ -358,7 +358,7 @@ void __init setup_machine_fdt(phys_addr_t dt_phys)
 	/* Early fixups are done, map the FDT as read-only now */
 	g_dt_virt = fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL_RO);
 	if (!g_dt_virt)
-		printf("%d, fixmap_remap_fdt failed\r\n", __LINE__);
+		pr_err("%d, fixmap_remap_fdt failed\r\n", __LINE__);
 	else
-		printf("fixmap_remap_fdt success\r\n");
+		pr_info("fixmap_remap_fdt success\r\n");
 }

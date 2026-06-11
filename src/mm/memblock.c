@@ -520,7 +520,7 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	 * of memory that aren't suitable for allocation
 	 */
 	if (!memblock_can_resize) {
-		printf("memblock: cannot resize %s array\n", type->name);
+		pr_err("memblock: cannot resize %s array\n", type->name);
 		return -1;
 	}
 

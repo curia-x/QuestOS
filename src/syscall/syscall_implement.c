@@ -11,7 +11,7 @@
 
 static long do_exit(long code)
 {
-	printf("process:%s exited(%d).\n", current->name, code);
+	pr_notice("process:%s exited(%d).\n", current->name, code);
 
 	current->state = PROCESS_ZOMBIE;
 
@@ -28,13 +28,13 @@ static ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count)
 	char buffer[128];
 
 	if (copy_from_user(buffer, buf, count)) {
-		printf("%s, copy_from_user failed\n", current->name);
+		pr_err("%s, copy_from_user failed\n", current->name);
 		return -EFAULT;
 	}
 
 	buffer[count] = '\0';
 
-	printf("cpu[%d]%s", get_smp_processor_id(), buffer);
+	pr_notice("cpu[%d]: %s", get_smp_processor_id(), buffer);
 
 	return count;
 }

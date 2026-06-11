@@ -23,7 +23,7 @@ cpuhp_state_register(enum cpuhp_state state,
 					void *data)
 {
 	if (state <= CPUHP_OFFLINE || state >= CPUHP_MAX || !callback) {
-		printf("cpuhp state register failed, invalid param\n");
+		pr_err("cpuhp state register failed, invalid param\n");
 		return -EINVAL;
 	}
 
@@ -43,7 +43,7 @@ int cpuhp_bringup_cpu(unsigned int cpu)
 			continue;
 		err = g_cpuhp_callbacks[i].callback(cpu, g_cpuhp_callbacks[i].data);
 		if (err) {
-			printf("cpuhp:%s for %u fail.\n", g_cpuhp_callbacks[i].name, cpu);
+			pr_err("cpuhp:%s for %u fail.\n", g_cpuhp_callbacks[i].name, cpu);
 			goto err;
 		}
 	}
@@ -69,7 +69,7 @@ void cpuhp_init_to_online(void)
 			continue;
 		err = g_cpuhp_callbacks[i].callback(cpu, g_cpuhp_callbacks[i].data);
 		if (err) {
-			printf("cpuhp:%s for %u fail.\n", g_cpuhp_callbacks[i].name, cpu);
+			pr_err("cpuhp:%s for %u fail.\n", g_cpuhp_callbacks[i].name, cpu);
 			goto err;
 		}
 	}

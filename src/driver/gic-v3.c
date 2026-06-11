@@ -111,7 +111,7 @@ static void __gic_handle_irq(u32 irqnr, struct pt_regs *regs)
 		return;
 
 	if (generic_handle_domain_irq(gic_data.domain, irqnr))
-		printf("Unexpected interrupt (irqnr %u)\n", irqnr);
+		pr_warn("Unexpected interrupt (irqnr %u)\n", irqnr);
 
 	write_gicreg(irqnr, ICC_EOIR1_EL1);
 	isb();
@@ -181,7 +181,7 @@ static int __gic_update_rdist_properties(struct redist_region *region,
 
 	/* Detect non-sensical configurations */
 	if (gic_data.features.has_rvpeid && !gic_data.features.has_vlpis) {
-		printf("GICR @0x%p: has RVPEID but no VLPIs, disabling DirectLPI support\n", ptr);
+		pr_warn("GICR @0x%p: has RVPEID but no VLPIs, disabling DirectLPI support\n", ptr);
 		gic_data.features.has_direct_lpi = false;
 		gic_data.features.has_vlpis = false;
 		gic_data.features.has_rvpeid = false;
@@ -205,7 +205,7 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
 		reg = read_u32(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
 		if (reg != GIC_PIDR2_ARCH_GICv3 &&
 		    reg != GIC_PIDR2_ARCH_GICv4) { /* We're in trouble... */
-			printf("No redistributor present @0x%p\n", ptr);
+			pr_alert("No redistributor present @0x%p\n", ptr);
 			break;
 		}
 
@@ -236,16 +236,16 @@ static void gic_update_rdist_properties(void)
 	gic_data.ppi_nr = UINT_MAX;
 	gic_iterate_rdists(__gic_update_rdist_properties);
 	if (gic_data.ppi_nr == UINT_MAX) {
-		printf("Couldn't determine the number of PPIs, defaulting to 0\n");
+		pr_err("Couldn't determine the number of PPIs, defaulting to 0\n");
 		gic_data.ppi_nr = 0;
 	}
-	printf("GICv3 features: %d PPIs%s%s\n",
+	pr_notice("GICv3 features: %d PPIs%s%s\n",
 		gic_data.ppi_nr,
 		gic_data.has_rss ? ", RSS" : "",
 		gic_data.features.has_direct_lpi ? ", DirectLPI" : "");
 
 	if (gic_data.features.has_vlpis)
-		printf("GICv4 features: %s%s%s\n",
+		pr_notice("GICv4 features: %s%s%s\n",
 			gic_data.features.has_direct_lpi ? "DirectLPI " : "",
 			gic_data.features.has_rvpeid ? "RVPEID " : "",
 			gic_data.features.has_vpend_valid_dirty ? "Valid+Dirty " : "");
@@ -261,7 +261,7 @@ static void gic_cpu_sys_reg_enable(void)
 	 * Kindly inform the luser.
 	 */
 	if (!gic_enable_sre())
-		printf("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+		pr_emerg("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
 
 }
 
@@ -325,9 +325,9 @@ static void gic_prio_init(void)
 
 			ds = gic_dist_security_disabled();
 			if (ds)
-				printf("Broken GIC integration, security disabled\n");
+				pr_err("Broken GIC integration, security disabled\n");
 		} else {
-			printf("Broken GIC integration, pNMI forbidden\n");
+			pr_err("Broken GIC integration, pNMI forbidden\n");
 			nmi_support_forbidden = true;
 		}
 	}
@@ -369,7 +369,7 @@ static void gic_prio_init(void)
 		dist_prio_nmi = __gicv3_prio_to_ns(dist_prio_nmi);
 	}
 
-	printf("GICD_CTLR.DS=%d, SCR_EL3.FIQ=%d\n",
+	pr_notice("GICD_CTLR.DS=%d, SCR_EL3.FIQ=%d\n",
 		cpus_have_security_disabled,
 		!cpus_have_group0);
 }
@@ -382,7 +382,7 @@ static void gic_do_wait_for_rwp(void __iomem *base, u32 bit)
 	ret = readx_poll_timeout_atomic(read_u32, base + GICD_CTLR, val, !(val & bit),
 						1, USEC_PER_SEC);
 	if (ret == -ETIMEDOUT)
-		printf("RWP timeout, gone fishing\n");
+		pr_err("RWP timeout, gone fishing\n");
 }
 
 /* Wait for completion of a distributor change */
@@ -476,12 +476,11 @@ static void gic_dist_init(void)
 
 	val = GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1;
 	if (gic_data.features.gicd_typer2 & GICD_TYPER2_nASSGIcap) {
-		printf("Enabling SGIs without active state\n");
+		pr_notice("Enabling SGIs without active state\n");
 		val |= GICD_CTLR_nASSGIreq;
 	}
 
 	/* Enable distributor with ARE, Group1, and wait for it to drain */
-	/* 使能distributor */
 	__raw_writel(val, base + GICD_CTLR);
 	gic_dist_wait_for_rwp();
 
@@ -489,7 +488,6 @@ static void gic_dist_init(void)
 	 * Set all global interrupts to the boot CPU only. ARE must be
 	 * enabled.
 	 */
-	/* 设置默认路由，全都路由到boot cpu */
 	affinity = gic_mpidr_to_affinity(get_mpidr());
 	for (i = 32; i < GIC_LINE_NR; i++)
 		__raw_writeq(affinity, base + GICD_IROUTER + i * 8);
@@ -514,7 +512,7 @@ static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 		gic_data_rdist_rd_base() = ptr;
 		gic_data_rdist()->phys_base = region->phys_base + offset;
 
-		printf("CPU%d: found redistributor %lx region %d:0x%p\n",
+		pr_notice("CPU%d: found redistributor %lx region %d:0x%p\n",
 			cpu, mpidr,
 			(int)(region - gic_data.redist_regions),
 			gic_data_rdist_rd_base());
@@ -533,7 +531,7 @@ static int gic_populate_rdist(void)
 		return 0;
 
 	/* We couldn't even deal with ourselves... */
-	printf("CPU%d: mpidr %lx has no re-distributor!\n",
+	pr_alert("CPU%d: mpidr %lx has no re-distributor!\n",
 	     mpidr_to_processor_id(mpidr), mpidr);
 	return -ENODEV;
 }
@@ -564,7 +562,7 @@ static void gic_enable_redist(bool enable)
 						enable ^ (bool)(val & GICR_WAKER_ChildrenAsleep),
 						1, USEC_PER_SEC);
 	if (ret == -ETIMEDOUT) {
-		printf("redistributor failed to %s...\n",
+		pr_err("redistributor failed to %s...\n",
 				   enable ? "wakeup" : "sleep");
 	}
 }
@@ -716,7 +714,7 @@ static void gic_cpu_init(void)
 
 	if ((gic_data.ppi_nr > 16 || GIC_ESPI_NR != 0) &
 	     !(gic_read_ctlr() & ICC_CTLR_EL1_ExtRange))
-		printf("Distributor has extended ranges, but CPU%d doesn't\n",
+		pr_warn("Distributor has extended ranges, but CPU%d doesn't\n",
 			get_smp_processor_id());
 
 	rbase = gic_data_rdist_sgi_base();
@@ -754,8 +752,8 @@ static int gic_init_bases(phys_addr_t dist_phys_base,
 	typer = read_u32(gic_data.dist_base + GICD_TYPER);
 	gic_data.features.gicd_typer = typer;
 
-	printf("%d SPIs implemented\n", GIC_LINE_NR - 32);
-	printf("%d Extended SPIs implemented\n", GIC_ESPI_NR);
+	pr_notice("%d SPIs implemented\n", GIC_LINE_NR - 32);
+	pr_notice("%d Extended SPIs implemented\n", GIC_ESPI_NR);
 
 	gic_data.features.gicd_typer2 = read_u32(gic_data.dist_base + GICD_TYPER2);
 
@@ -769,7 +767,7 @@ static int gic_init_bases(phys_addr_t dist_phys_base,
 
 	ret = set_handle_irq(gic_v3_handle_irq);
 	if (ret < 0) {
-		printf("Failed to set GICv3 IRQ handler: %d\n", ret);
+		pr_err("Failed to set GICv3 IRQ handler: %d\n", ret);
 		return ret;
 	}
 
@@ -856,7 +854,7 @@ int gic_v3_init(void)
 
 	ret = gic_validate_dist_version(gicd_base);
 	if (ret < 0) {
-		printf("GICv3 distributor version validation failed: %d\n", ret);
+		pr_err("GICv3 distributor version validation failed: %d\n", ret);
 		return ret;
 	}
 
@@ -877,11 +875,11 @@ int gic_v3_init(void)
 
 	ret = cpuhp_state_register(CPUHP_INIT_GIC, "gic_v3_starting", gic_starting_cpu, NULL);
 	if (ret) {
-		printf("Failed to register GICv3 starting CPU handler: %d\n", ret);
+		pr_err("Failed to register GICv3 starting CPU handler: %d\n", ret);
 		return ret;
 	}
 
-	printf("gic-v3 init success.\n");
+	pr_info("gic-v3 init success.\n");
 
 	return 0;
 }

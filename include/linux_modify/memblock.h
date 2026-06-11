@@ -7,18 +7,8 @@
 #include <nodemask_types.h>
 #include <print.h>
 
-#ifdef DEBUG
-#define memblock_dbg(fmt, ...)                         \
-	do {                                               \
-		printf(fmt, ##__VA_ARGS__);                    \
-	} while (0)
-#else
-#define memblock_dbg(fmt, ...)                         \
-	do {                                               \
-		if (0)                                         \
-			printf(fmt, ##__VA_ARGS__);         \
-	} while (0)
-#endif
+#define memblock_dbg(fmt, ...) \
+	pr_debug("memblock: " fmt, ##__VA_ARGS__)
 
 #ifndef CONFIG_ARCH_KEEP_MEMBLOCK
 #define __init_memblock __meminit

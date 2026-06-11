@@ -29,12 +29,12 @@ int request_irq(unsigned int hwirq, irq_handler_t handler, unsigned long flags,
 	struct irq_desc *desc = &g_irq_descs[hwirq];
 
 	if ((hwirq >= IRQ_NUMS) || (hwirq < 0)) {
-		printf("Irq num error:%d\n", hwirq);
+		pr_err("Irq num error:%d\n", hwirq);
 		return -EINVAL;
 	}
 
 	if (desc->action && desc->action->handler != handler) {
-		printf("Hwirq:%d, has been requested by %s\n", hwirq, desc->action->name);
+		pr_err("Hwirq:%d, has been requested by %s\n", hwirq, desc->action->name);
 		return -EEXIST;
 	}
 
@@ -55,7 +55,7 @@ int request_irq(unsigned int hwirq, irq_handler_t handler, unsigned long flags,
 static irqreturn_t irq_default_handler(int hwirq, void *dev)
 {
 	(void)dev;
-	printf("%s:hwirq:%d\n", hwirq);
+	pr_notice("%s:hwirq:%d\n", hwirq);
 	return IRQ_NONE;
 }
 
@@ -70,7 +70,7 @@ static void handle_fasteoi_irq(struct irq_desc *desc)
 		irqreturn = irq_default_handler(hwirq, NULL);
 
 	if (irqreturn != IRQ_HANDLED)
-		printf("HWIRQ:%d, not be properly handled\n", hwirq);
+		pr_warn("HWIRQ:%d, not be properly handled\n", hwirq);
 }
 
 static int handle_irq_desc(struct irq_desc *desc)
@@ -90,12 +90,12 @@ int generic_handle_domain_irq(struct irq_domain *domain, unsigned int hwirq)
 int irq_chip_register(struct irq_chip *chip)
 {
 	if (!chip) {
-		printf("Param error, chip is NULL.\n");
+		pr_err("Param error, chip is NULL.\n");
 		return -EINVAL;
 	}
 
 	if (g_irq_chip) {
-		printf("Other chip is exist.\n");
+		pr_err("Other chip is exist.\n");
 		return -EEXIST;
 	}
 

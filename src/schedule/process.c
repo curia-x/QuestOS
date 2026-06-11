@@ -75,7 +75,7 @@ static int process_map_memory(struct memory_struct *mm, phys_addr_t phys,
 
 	err = vmap_phys_range_noflush(mm, phys, virt, size, pgprot);
 	if (err) {
-		printf("process memory map failed:virt=0x%x, size=%llu\n", virt, size);
+		pr_err("process memory map failed:virt=0x%x, size=%llu\n", virt, size);
 		goto fail_clean_up;
 	}
 
@@ -110,7 +110,7 @@ static int process_map_segments(struct memory_struct *mm)
 		err = process_map_memory(mm, segment->pa, segment->va_start,
 							segment->va_end - segment->va_start, pgprot);
 		if (err) {
-			printf("process segment:0x%x~0x%x map failed\n",
+			pr_err("process segment:0x%x~0x%x map failed\n",
 						segment->va_start, segment->va_end);
 			return err;
 		}
@@ -121,10 +121,6 @@ static int process_map_segments(struct memory_struct *mm)
 
 static inline int process_map_stack(struct memory_struct *mm)
 {
-	printf("PROCESS_STACK_TOP:0x%llx\n", PROCESS_STACK_TOP);
-	printf("user stack size:0x%llx\n", mm->stack_size);
-	printf("user stack size:0x%llx\n", mm->stack_size);
-	printf("stack kaddr:0x%llx\n", mm->stack);
 	return process_map_rw(mm, virt_to_phys((void *)mm->stack),
 					PROCESS_STACK_TOP - mm->stack_size, mm->stack_size);
 }
@@ -214,26 +210,6 @@ static int process_stack_init(struct process_struct *proc, size_t *stack_used_si
 	*stack_used_size = used_size;
 
 	return 0;
-
-	// for (int i = img->auxv_count - 1; i >= 0; i--) {
-	// 	current_sp -= sizeof(struct proc_auxv_entry);
-	// 	memcpy(current_sp, img->auxv[i], sizeof(struct proc_auxv_entry));
-	// }
-
-	// for (int i = img->env_count - 1; i >= 0; i--) {
-	// 	current_sp -= sizeof(char *);
-	// 	*(char *)current_sp = img->env[i] - meta_base + PROCESS_META_START;
-	// }
-
-	// for (int i = img->argc - 1; i >= 0; i--) {
-	// 	current_sp -= sizeof(char *);
-	// 	*(char *)current_sp = img->argv[i] - meta_base + PROCESS_META_START;
-	// }
-
-	// current_sp -= sizeof(u32);
-	// *(u32 *)current_sp = img->argc;
-
-	// return sp_top - current_sp;
 }
 
 static int process_memory_init(struct process_struct *proc)
@@ -244,28 +220,28 @@ static int process_memory_init(struct process_struct *proc)
 
 	stack_size = proc->image.stack_size;
 	if (stack_size > PROCESS_MAX_STACK_SIZE) {
-		printf("process stack size too large, set to 0x%llx\n", PROCESS_MAX_STACK_SIZE);
+		pr_warn("process stack size too large, set to 0x%llx\n", PROCESS_MAX_STACK_SIZE);
 		stack_size = PROCESS_MAX_STACK_SIZE;
 	} else if (stack_size == 0) {
-		printf("set to default stack size 0x%llx\n", PROCESS_DEFAULT_STACK_SIZE);
+		pr_warn("set to default stack size 0x%llx\n", PROCESS_DEFAULT_STACK_SIZE);
 		stack_size = PROCESS_DEFAULT_STACK_SIZE;
 	}
 
-	printf("process statck size:%llu\n", stack_size);
+	pr_debug("process statck size:%llu\n", stack_size);
 
 	mm->stack = kmalloc(stack_size, __GFP_ZERO);
 	if (!mm->stack) {
-		printf("process stack alloc failed\n");
+		pr_err("process stack alloc failed\n");
 		return -ENOMEM;
 	}
 	mm->stack = (void *)ALIGN_UP(mm->stack, PAGE_SIZE);
 
-	printf("stack:0x%lx\n", mm->stack);
+	pr_debug("stack:0x%lx\n", mm->stack);
 	mm->stack_size = stack_size;
 
 	mm->heap = kmalloc(PROCESS_DEFAULT_HEAP_SIZE, __GFP_ZERO);
 	if (!mm->heap) {
-		printf("process heap alloc failed\n");
+		pr_err("process heap alloc failed\n");
 		err = -ENOMEM;
 		goto heap_alloc_fail;
 	}
@@ -273,7 +249,7 @@ static int process_memory_init(struct process_struct *proc)
 
 	mm->pg_dir_unaligned = kmalloc(PAGE_SIZE, __GFP_ZERO);
 	if (!mm->pg_dir_unaligned) {
-		printf("process page table alloc failed\n");
+		pr_err("process page table alloc failed\n");
 		err = -ENOMEM;
 		goto pg_tbl_alloc_fail;
 	}
@@ -281,19 +257,19 @@ static int process_memory_init(struct process_struct *proc)
 
 	err = process_map_segments(&proc->mm);
 	if (err) {
-		printf("process_map_segments failed, err=%d\n", err);
+		pr_err("process_map_segments failed, err=%d\n", err);
 		goto memory_map_error;
 	}
 
 	err = process_map_meta(proc);
 	if (err) {
-		printf("process_map_meta failed, err=%d\n", err);
+		pr_err("process_map_meta failed, err=%d\n", err);
 		goto memory_map_error;
 	}
 
 	err = process_map_stack(&proc->mm);
 	if (err) {
-		printf("process_map_stack failed, err=%d\n", err);
+		pr_err("process_map_stack failed, err=%d\n", err);
 		goto memory_map_error;
 	}
 
@@ -368,13 +344,13 @@ void user_processes_struct_init(void)
 		sp_el0 = PROCESS_STACK_TOP;
 		err = process_memory_init(proc);
 		if (err) {
-			printf("process %d memory init failed\n", i);
+			pr_err("process %d memory init failed\n", i);
 			goto destory_process;
 		}
 
 		err = process_stack_init(proc, &sp_el0_used);
 		if (err) {
-			printf("process stack init failed: %d\n", err);
+			pr_err("process stack init failed: %d\n", err);
 			goto release_mm_resource;
 		}
 
@@ -383,7 +359,7 @@ void user_processes_struct_init(void)
 		proc->kernel_stack = kzalloc(PROCESS_DEFAULT_KERNEL_STACK_SIZE, 0);
 		if (!proc->kernel_stack) {
 			err = -ENOMEM;
-			printf("process %d kernel stack alloc failed\n", i);
+			pr_err("process %d kernel stack alloc failed\n", i);
 			goto release_mm_resource;
 		}
 
@@ -453,7 +429,7 @@ static int check_image_desc(struct proc_pkg_header *h, struct proc_image_desc *d
 	u64 payload_start = ALIGN(h->desc_offset + h->desc_size, PAGE_SIZE);
 
 	if (d->image_offset >= h->total_size || d->meta_offset >= h->total_size) {
-		printf("desc error: wrong offset, image=0x%llx, meta=0x%llx, pkg size=0x%llx\n",
+		pr_err("desc error: wrong offset, image=0x%llx, meta=0x%llx, pkg size=0x%llx\n",
 				(unsigned long long)d->image_offset,
 				(unsigned long long)d->meta_offset,
 				(unsigned long long)h->total_size);
@@ -461,7 +437,7 @@ static int check_image_desc(struct proc_pkg_header *h, struct proc_image_desc *d
 	}
 
 	if ((d->image_offset < payload_start) || (d->meta_offset < payload_start)) {
-		printf("desc error: offset error, image=0x%llx, meta=0x%llx, payload start=0x%llx\n",
+		pr_err("desc error: offset error, image=0x%llx, meta=0x%llx, payload start=0x%llx\n",
 				(unsigned long long)d->image_offset,
 				(unsigned long long)d->meta_offset,
 				(unsigned long long)payload_start);
@@ -470,7 +446,7 @@ static int check_image_desc(struct proc_pkg_header *h, struct proc_image_desc *d
 
 	if (d->image_size == 0 || d->image_size > PROCESS_MAX_IMAGE_SIZE ||
 		d->meta_size == 0 || d->meta_size > PROCESS_MAX_META_SIZE) {
-		printf("desc error: wrong size, image=%llu, meta=%llu\n",
+		pr_err("desc error: wrong size, image=%llu, meta=%llu\n",
 			(unsigned long long)d->image_size,
 			(unsigned long long)d->meta_size);
 		return -EINVAL;
@@ -478,7 +454,7 @@ static int check_image_desc(struct proc_pkg_header *h, struct proc_image_desc *d
 
 	if ((d->image_size > h->total_size - d->image_offset) ||
 		(d->meta_size > h->total_size - d->meta_offset)) {
-		printf("desc error: size error, image/meta offset:0x%llx/0x%llx, image/meta size:%llu/%llu, pkg size=%llu\n",
+		pr_err("desc error: size error, image/meta offset:0x%llx/0x%llx, image/meta size:%llu/%llu, pkg size=%llu\n",
 				(unsigned long long)d->image_offset,
 				(unsigned long long)d->meta_offset,
 				(unsigned long long)d->image_size,
@@ -489,7 +465,7 @@ static int check_image_desc(struct proc_pkg_header *h, struct proc_image_desc *d
 
 	/* 4k alignment */
 	if ((d->image_offset & 0xfff) != 0 || (d->meta_offset & 0xfff) != 0) {
-		printf("desc error: offset not 4k align, image=0x%llx, meta=0x%llx\n",
+		pr_err("desc error: offset not 4k align, image=0x%llx, meta=0x%llx\n",
 				(unsigned long long)d->image_offset,
 				(unsigned long long)d->meta_offset);
 		return -EINVAL;
@@ -500,7 +476,7 @@ static int check_image_desc(struct proc_pkg_header *h, struct proc_image_desc *d
 	case PROC_IMG_FLAT:
 		return 0;
 	default:
-		printf("desc error: unknown desc type, %d\n", d->type);
+		pr_err("desc error: unknown desc type, %d\n", d->type);
 		return -EINVAL;
 	}
 }
@@ -580,13 +556,13 @@ static int check_section_region_valid(struct process_struct *process, Elf64_Phdr
 	if (ph->p_vaddr < PROCESS_IMAGE_START ||
 		(ph->p_vaddr + ph->p_memsz) > PROCESS_IMAGE_END ||
 		(ph->p_vaddr + ph->p_memsz) < ph->p_vaddr) {
-		printf("segment:0x%x ~ 0x%x invalid\n", ph->p_vaddr, ph->p_vaddr + ph->p_memsz);
+		pr_err("segment:0x%x ~ 0x%x invalid\n", ph->p_vaddr, ph->p_vaddr + ph->p_memsz);
 		return -EINVAL;
 	}
 
 	err = check_vmem_region_overlap(process, ph->p_vaddr, ph->p_memsz);
 	if (err) {
-		printf("segment overlap with exist segment\n");
+		pr_err("segment overlap with exist segment\n");
 		return err;
 	}
 
@@ -608,7 +584,7 @@ static int load_user_elf(void *elf_base, u64 elf_size, struct process_struct **o
 
 	err = check_elf64_aarch64(elf_base, elf_size);
 	if (err) {
-		printf("%s, check elf header failed, base:0x%x, size0x%x\n", __func__, elf_base, elf_size);
+		pr_err("%s, check elf header failed, base:0x%x, size0x%x\n", __func__, elf_base, elf_size);
 		return err;
 	}
 
@@ -617,7 +593,7 @@ static int load_user_elf(void *elf_base, u64 elf_size, struct process_struct **o
 
 	process = kzalloc(sizeof(struct process_struct), 0);
 	if (!process) {
-		printf("process_struct alloc failed, no enough memory.\n");
+		pr_err("process_struct alloc failed, no enough memory.\n");
 		return -ENOMEM;
 	}
 
@@ -630,13 +606,13 @@ static int load_user_elf(void *elf_base, u64 elf_size, struct process_struct **o
 
 		err = check_elf_ph(ph, elf_size);
 		if (err) {
-			printf("segment[%d] invalid.\n", i);
+			pr_err("segment[%d] invalid.\n", i);
 			goto section_load_failed;
 		}
 
 		err = check_section_region_valid(process, ph);
 		if (err) {
-			printf("check_vmem_region_valid failed, err:%d\n", err);
+			pr_err("check_vmem_region_valid failed, err:%d\n", err);
 			goto section_load_failed;
 		}
 
@@ -717,7 +693,7 @@ static int check_string_ref(const char *string_table, u32 string_table_size,
 	size_t len;
 
 	if (str_off >= string_table_size) {
-		printf("%s[%d] string offset out of range: off=%u, size=%u\n",
+		pr_err("%s[%d] string offset out of range: off=%u, size=%u\n",
 		       name, index, str_off, string_table_size);
 		return -EINVAL;
 	}
@@ -726,7 +702,7 @@ static int check_string_ref(const char *string_table, u32 string_table_size,
 	len = strnlen(string_table + str_off, remain);
 
 	if (len == remain) {
-		printf("%s[%d] string is not nul-terminated\n", name, index);
+		pr_err("%s[%d] string is not nul-terminated\n", name, index);
 		return -EINVAL;
 	}
 
@@ -741,7 +717,7 @@ static int check_image_meta(struct proc_image_meta *meta, u64 meta_size)
 	if (meta->argv_count > PROCESS_MAX_ARGV_COUNT ||
 		meta->env_count > PROCESS_MAX_ENV_COUNT ||
 		meta->auxv_count > PROCESS_MAX_AUXV_COUNT) {
-		printf("meta count exceed the limit, argc:%u, env:%u, auxv:%u\n",
+		pr_err("meta count exceed the limit, argc:%u, env:%u, auxv:%u\n",
 			meta->argv_count, meta->env_count, meta->auxv_count);
 		return -EINVAL;
 	}
@@ -758,26 +734,26 @@ static int check_image_meta(struct proc_image_meta *meta, u64 meta_size)
 			     meta->auxv_count,
 			     sizeof(struct proc_auxv_entry),
 			     meta_size)) {
-		printf("image meta: offset/count range error\n");
-		printf("\tmeta size=%llu\n", (unsigned long long)meta_size);
-		printf("\targv count:%u, argv_offset:0x%x\n",
+		pr_err("image meta: offset/count range error\n");
+		pr_err("\tmeta size=%llu\n", (unsigned long long)meta_size);
+		pr_err("\targv count:%u, argv_offset:0x%x\n",
 		       meta->argv_count, meta->argv_offset);
-		printf("\tenv count:%u, env_offset:0x%x\n",
+		pr_err("\tenv count:%u, env_offset:0x%x\n",
 		       meta->env_count, meta->env_offset);
-		printf("\tauxv count:%u, auxv_offset:0x%x\n",
+		pr_err("\tauxv count:%u, auxv_offset:0x%x\n",
 		       meta->auxv_count, meta->auxv_offset);
 		return -EINVAL;
 	}
 
 	if (meta->auxv_count && (meta->auxv_offset & 0x7)) {
-		printf("image meta: auxv_offset is not 8-byte aligned: 0x%x\n",
+		pr_err("image meta: auxv_offset is not 8-byte aligned: 0x%x\n",
 		       meta->auxv_offset);
 		return -EINVAL;
 	}
 
 	if (meta->string_table_offset > meta_size ||
 	    meta->string_table_size > meta_size - meta->string_table_offset) {
-		printf("image meta: string table range error, offset=0x%x, size=%u, meta size=%llu\n",
+		pr_err("image meta: string table range error, offset=0x%x, size=%u, meta size=%llu\n",
 		       meta->string_table_offset,
 		       meta->string_table_size,
 		       (unsigned long long)meta_size);
@@ -785,7 +761,7 @@ static int check_image_meta(struct proc_image_meta *meta, u64 meta_size)
 	}
 
 	if ((meta->argv_count || meta->env_count) && meta->string_table_size == 0) {
-		printf("image meta: empty string table with argv/env entries\n");
+		pr_err("image meta: empty string table with argv/env entries\n");
 		return -EINVAL;
 	}
 
@@ -822,11 +798,11 @@ static int check_image_meta(struct proc_image_meta *meta, u64 meta_size)
 	}
 
 	if (meta->reserved != 0)
-		printf("image meta warning: reserved field should be zero.\n");
+		pr_warn("image meta warning: reserved field should be zero.\n");
 
 	/* stack size will be checked when allocating stack space for process */
 	if (meta->stack_size & (PAGE_SIZE - 1)) {
-		printf("image meta: stack size should be aligned to PAGE_SIZE\n");
+		pr_err("image meta: stack size should be aligned to PAGE_SIZE\n");
 		return -EINVAL;
 	}
 
@@ -846,7 +822,7 @@ load_user_meta(void *meta_base, u64 meta_size, struct process_struct *process)
 
 	err = check_image_meta(meta, meta_size);
 	if (err) {
-		printf("image meta check failed, err=%d\n", err);
+		pr_err("image meta check failed, err=%d\n", err);
 		return err;
 	}
 
@@ -892,7 +868,7 @@ static int load_one_image(struct proc_pkg_header *header, u32 index)
 	struct process_struct *process;
 	struct proc_image_desc *desc;
 
-	printf("desc_offset:0x%x, desc_size:0x%x, index:%d\n",
+	pr_debug("desc_offset:0x%x, desc_size:0x%x, index:%d\n",
 			header->desc_offset, header->desc_size, index);
 
 	package_base = header;
@@ -900,7 +876,7 @@ static int load_one_image(struct proc_pkg_header *header, u32 index)
 	desc = ((void *)header) + header->desc_offset + index * sizeof(struct proc_image_desc);
 	err = check_image_desc(header, desc);
 	if (err) {
-		printf("%s, check image desc failed, index:%d, err=%d\n", __func__, index, err);
+		pr_err("%s, check image desc failed, index:%d, err=%d\n", __func__, index, err);
 		return err;
 	}
 
@@ -913,18 +889,18 @@ static int load_one_image(struct proc_pkg_header *header, u32 index)
 	if (desc->type == PROC_IMG_ELF) {
 		err = load_user_elf(image_base, image_size, &process);
 		if (err) {
-			printf("load_user_elf failed, err:0x%x\n", err);
+			pr_err("load_user_elf failed, err:0x%x\n", err);
 			return err;
 		}
 
 		err = load_user_meta(meta_base, meta_size, process);
 		if (err) {
-			printf("load_user_meta failed, err:0x%x\n", err);
+			pr_err("load_user_meta failed, err:0x%x\n", err);
 			free_user_elf(process);
 			return err;
 		}
 	} else {
-		printf("Image type 0x%x currently not supported\n", desc->type);
+		pr_err("Image type 0x%x currently not supported\n", desc->type);
 		return -EINVAL;
 	}
 
@@ -944,7 +920,7 @@ static int load_processes(void)
 
 	err = check_pkg_header(header, LDSYM_ADDR(__process_blob_end) - LDSYM_ADDR(__process_blob_start));
 	if (err) {
-		printf("No valid package header found.\n");
+		pr_err("No valid package header found.\n");
 		return -ENOENT;
 	}
 
@@ -952,13 +928,13 @@ static int load_processes(void)
 
 	for (int i = 0; i < image_count; i++) {
 		if (g_processes_count >= PROCESS_MAX_COUNT) {
-			printf("process count exceed the limit:%d\n", PROCESS_MAX_COUNT);
+			pr_err("process count exceed the limit:%d\n", PROCESS_MAX_COUNT);
 			break;
 		}
 
 		err = load_one_image(header, i);
 		if (err) {
-			printf("Load image %d failed\n", i);
+			pr_err("Load image %d failed\n", i);
 			continue;
 		}
 
@@ -980,7 +956,7 @@ void user_processes_register(void)
 		 */
 		err = sched_register_process(i % MAX_CPUS, g_processes[i]);
 		if (err)
-			printf("process %d register failed\n", i);
+			pr_err("process %d register failed\n", i);
 	}
 }
 
@@ -990,11 +966,11 @@ static void user_processes_init(void)
 
 	count = load_processes();
 	if (count <= 0) {
-		printf("No process loaded.\n");
+		pr_warn("No process loaded.\n");
 		return;
 	}
 
-	printf("Load %d processes\n", count);
+	pr_notice("Load %d processes\n", count);
 
 	user_processes_struct_init();
 }
@@ -1014,20 +990,20 @@ static int idle_thread_create(unsigned int cpu, void *data)
 
 	idle = kmalloc(sizeof(struct process_struct), 0);
 	if (!idle) {
-		printf("idle process alloc failed for cpu%d\n", cpu);
+		pr_err("idle process alloc failed for cpu%d\n", cpu);
 		return -ENOMEM;
 	}
 
 	kthread = kmalloc(sizeof(struct kernel_thread), 0);
 	if (!kthread) {
-		printf("idle kernel_thread alloc failed for cpu%d\n", cpu);
+		pr_err("idle kernel_thread alloc failed for cpu%d\n", cpu);
 		kfree(idle);
 		return -ENOMEM;
 	}
 
 	kernel_stack = kmalloc(THREAD_SIZE, 0);
 	if (!kernel_stack) {
-		printf("idle kernel stack alloc failed for cpu%d\n", cpu);
+		pr_err("idle kernel stack alloc failed for cpu%d\n", cpu);
 		kfree(idle);
 		return -ENOMEM;
 	}
@@ -1045,7 +1021,7 @@ static int idle_thread_create(unsigned int cpu, void *data)
 	idle->name[4] = '0' + cpu; /* set name to idle1, idle2, ... */
 	per_cpu(idle_process, cpu) = idle;
 
-	printf("idle=0x%x, cpu=%u\n", idle, cpu);
+	pr_debug("idle=0x%x, cpu=%u\n", idle, cpu);
 
 	return 0;
 }

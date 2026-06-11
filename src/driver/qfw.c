@@ -75,7 +75,7 @@ static void qfw_mmio_read_item_io(u16 entry, u32 size, void *address)
 /* Read configuration item using fw_cfg DMA interface */
 static void qfw_mmio_read_item_dma(struct qfw_dma *dma)
 {
-	printf("DMA read: addr=%#llx len=%u control=%#x\n",
+	pr_debug("DMA read: addr=%#llx len=%u control=%#x\n",
 	       be64_to_cpu(dma->address), be32_to_cpu(dma->length),
 	       be32_to_cpu(dma->control));
 
@@ -101,7 +101,7 @@ static void qfw_read_item_dma(u16 entry, u32 size, void *address)
 	if (entry != FW_CFG_INVALID)
 		dma.control |= cpu_to_be32(FW_CFG_DMA_SELECT | (entry << 16));
 
-	printf("%s: entry 0x%x, size %u address 0x%p, control 0x%x\n", __func__,
+	pr_debug("%s: entry 0x%x, size %u address 0x%p, control 0x%x\n", __func__,
 	      entry, size, address, be32_to_cpu(dma.control));
 
 	barrier();
@@ -128,7 +128,7 @@ int qfw_load_images(void)
 	qfw_read_item(FW_CFG_KERNEL_SIZE, 4, &kernel_size);
 
 	if (!kernel_size) {
-		printf("fatal: no kernel available\n");
+		pr_err("fatal: no kernel available\n");
 		return -ENOENT;
 	}
 
@@ -150,7 +150,7 @@ int qfw_load_images(void)
 	data_addr = map_sysmem(INITRD_IMAGE_LOAD_ADDR, 0);
 	qfw_read_item(FW_CFG_INITRD_SIZE, 4, &initrd_size);
 	if (!initrd_size)
-		printf("warning: no initrd available\n");
+		pr_notice("warning: no initrd available\n");
 	else
 		qfw_read_item(FW_CFG_INITRD_DATA,
 			       le32_to_cpu(initrd_size), data_addr);
@@ -162,13 +162,13 @@ int qfw_load_images(void)
 			       le32_to_cpu(cmdline_size), data_addr);
 	}
 
-	printf("loading kernel to address %llx size %x", KERNEL_IMAGE_LOAD_ADDR,
+	pr_notice("loading kernel to address %llx size %x", KERNEL_IMAGE_LOAD_ADDR,
 		le32_to_cpu(kernel_size));
 	if (initrd_size)
-		printf(" initrd %llx size %x\n", INITRD_IMAGE_LOAD_ADDR,
+		pr_notice(" initrd %llx size %x\n", INITRD_IMAGE_LOAD_ADDR,
 		       le32_to_cpu(initrd_size));
 	else
-		printf("\n");
+		pr_notice("\n");
 
 	return 0;
 }
@@ -190,21 +190,21 @@ int qfw_init(void)
 
 	qfw_node = fdt_get_qfw_node();
 	if (qfw_node < 0) {
-		printf("Failed to find fw-cfg node in device tree\n");
+		pr_err("Failed to find fw-cfg node in device tree\n");
 		return -ENODEV;
 	}
 
-	printf("qfw_node=0x%x\r\n", qfw_node);
+	pr_debug("qfw_node=0x%x\r\n", qfw_node);
 
 	qfw_addr = fdt_get_addr(qfw_node);
 	if (qfw_addr == FDT_ADDR_T_NONE) {
-		printf("Failed to get fw-cfg address\n");
+		pr_err("Failed to get fw-cfg address\n");
 		return -EINVAL;
 	}
 
 	g_qfw_mmio = (struct qfw_mmio *)qfw_addr;
 
-	printf("qfw_mmio=0x%llx\r\n", (u64)g_qfw_mmio);
+	pr_debug("qfw_mmio=0x%llx\r\n", (u64)g_qfw_mmio);
 
 	return 0;
 }

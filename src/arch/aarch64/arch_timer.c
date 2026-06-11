@@ -39,7 +39,7 @@ static int __arch_timer_init(void)
 
 	ret = request_irq(ARCH_TIMER_CNTP_IRQ, timer_irq_handler, 0, "arch_timer_irq", NULL);
 	if (ret < 0) {
-		printf("Arch timer irq request failed:%d\n", ret);
+		pr_err("Arch timer irq request failed:%d\n", ret);
 		return ret;
 	}
 
@@ -62,18 +62,18 @@ int arch_timer_init(void)
 {
 	int ret;
 
-	printf("Arch timer freq:%u HZ\n", COUNTER_FREQ);
-	printf("Arch timer resolution:%u ns\n", COUNTER_RESOLUTION_NS);
+	pr_notice("Arch timer freq:%u HZ\n", COUNTER_FREQ);
+	pr_notice("Arch timer resolution:%u ns\n", COUNTER_RESOLUTION_NS);
 
 	ret = __arch_timer_init();
 	if (ret < 0) {
-		printf("Arch timer init failed:%d\n", ret);
+		pr_err("Arch timer init failed:%d\n", ret);
 		return ret;
 	}
 
 	ret = cpuhp_state_register(CPUHP_INIT_TIMER, "arch_timer_setup", cpuhp_arch_timer_setup, NULL);
 	if (ret) {
-		printf("Failed to register arch timer setup callback: %d\n", ret);
+		pr_err("Failed to register arch timer setup callback: %d\n", ret);
 		return ret;
 	}
 

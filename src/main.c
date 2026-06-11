@@ -48,17 +48,17 @@ void quest_os_main(void)
 
 	cpu_init();
 
-	printf("\r\n===============Welcome to Quest OS!===============\r\n");
+	pr_notice("\r\n===============Welcome to Quest OS!===============\r\n");
 
 	ret = gic_v3_init();
 	if (ret < 0) {
-		printf("Failed to initialize GICv3: %d\n", ret);
+		pr_err("Failed to initialize GICv3: %d\n", ret);
 		goto exit;
 	}
 
 	ret = arch_timer_init();
 	if (ret < 0) {
-		printf("Failed to initialize Arch Timer: %d\n", ret);
+		pr_err("Failed to initialize Arch Timer: %d\n", ret);
 		goto exit;
 	}
 
@@ -68,31 +68,31 @@ void quest_os_main(void)
 
 	ret = sched_init(SCHED_ROUND_ROBIN);
 	if (ret) {
-		printf("sched init failed, %d\n", ret);
+		pr_err("sched init failed, %d\n", ret);
 		goto exit;
 	}
 
 	ret = kthread_init();
 	if (ret) {
-		printf("kthread init failed, err=%d\n", ret);
+		pr_err("kthread init failed, err=%d\n", ret);
 		goto exit;
 	}
 
 	ret = psci_init();
 	if (ret) {
-		printf("psci init failed, err=%d\n", ret);
+		pr_err("psci init failed, err=%d\n", ret);
 		goto exit;
 	}
 
 	ret = smp_init();
 	if (ret) {
-		printf("smp init failed, err=%d\n", ret);
+		pr_err("smp init failed, err=%d\n", ret);
 		goto exit;
 	}
 
 	user_process_init();
 
-	printf("\n=========Press any key to load user app process=========\n\n");
+	pr_notice("\n=========Press any key to load user app process=========\n\n");
 	uart_recv();
 
 	user_processes_register();

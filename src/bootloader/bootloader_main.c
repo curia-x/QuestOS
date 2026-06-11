@@ -17,9 +17,9 @@
 
 static void print_option(void)
 {
-	printf("Please select boot option:\r\n");
-	printf("[L/l]: boot Linux\r\n");
-	printf("[Q/q]: boot Quest OS\r\n");
+	pr_notice("Please select boot option:\r\n");
+	pr_notice("[L/l]: boot Linux\r\n");
+	pr_notice("[Q/q]: boot Quest OS\r\n");
 }
 
 void cmd_process(void)
@@ -29,23 +29,23 @@ void cmd_process(void)
 
 	boot_option_t option;
 
-	printf("\r\n=======Welcome to QLoader!=======\r\n");
+	pr_notice("\r\n=======Welcome to QLoader!=======\r\n");
 	print_option();
 	while (1) {
 		ch = uart_recv();
-		printf("%c\r\n", ch);
+		pr_notice("%c\r\n", ch);
 		switch (ch) {
 		case '\r':
 		case '\n':
 			continue;
 		case 'L':
 		case 'l':
-			printf("Booting Linux...\r\n");
+			pr_notice("Booting Linux...\r\n");
 			option = BOOT_OPTION_LINUX;
 			break;
 		case 'Q':
 		case 'q':
-			printf("Booting Quest OS...\r\n");
+			pr_notice("Booting Quest OS...\r\n");
 			option = BOOT_OPTION_QUEST_OS;
 			break;
 		case 'H':
@@ -53,14 +53,14 @@ void cmd_process(void)
 			print_option();
 			continue;
 		default:
-			printf("Invalid option.\r\n\r\n");
+			pr_err("Invalid option.\r\n\r\n");
 			print_option();
 			continue;
 		}
 
 		ret = boot_process(option);
 		/* boot_process should not return */
-		printf("Boot %s failed, ret:%d\r\n",
+		pr_emerg("Boot %s failed, ret:%d\r\n",
 				option == BOOT_OPTION_LINUX ? "Linux" : "Quest OS", ret);
 		while (1)
 			;
@@ -79,18 +79,18 @@ void qloader_main(void)
 
 	ret = fdt_init((void *)(uintptr_t)FDT_BLOB_ADDR);
 	if (ret < 0) {
-		printf("Failed to initialize FDT: %d\n", ret);
+		pr_err("Failed to initialize FDT: %d\n", ret);
 		return;
 	}
 	ret = qfw_init();
 	if (ret < 0) {
-		printf("Failed to initialize firmware interface: %d\n", ret);
+		pr_err("Failed to initialize firmware interface: %d\n", ret);
 		return;
 	}
 
 	ret = boot_init();
 	if (ret < 0) {
-		printf("Failed to initialize boot contexts: %d\n", ret);
+		pr_err("Failed to initialize boot contexts: %d\n", ret);
 		return;
 	}
 	printf_set_ready();

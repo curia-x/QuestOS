@@ -44,7 +44,7 @@ static int bringup_nonboot_cpus(void)
 	for (int i = 1; i < num_possible_cpus(); i++) {
 		err |= cpuhp_bringup_cpu(i);
 		if (err)
-			printf("cpu[%d] bringup failed, err=%d\n", i, err);
+			pr_err("cpu[%d] bringup failed, err=%d\n", i, err);
 	}
 
 	return err;
@@ -76,13 +76,13 @@ int smp_init(void)
 
 	err = cpuhp_state_register(CPUHP_START_CPU, "cpuhp cpu start", cpuhp_start_cpu, NULL);
 	if (err) {
-		printf("CPUHP_START_CPU callback register failed\n");
+		pr_err("CPUHP_START_CPU callback register failed\n");
 		return err;
 	}
 
 	err = cpuhp_state_register(CPUHP_ONLINE, "cpuhp set cpu online", cpuhp_online_cpu, NULL);
 	if (err) {
-		printf("CPUHP_START_CPU callback register failed\n");
+		pr_err("CPUHP_START_CPU callback register failed\n");
 		return err;
 	}
 

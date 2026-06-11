@@ -19,10 +19,6 @@ static struct process_struct *round_robin_pick_next(void)
 	int *next_process = this_cpu_ptr(&g_next_process);
 	struct process_struct **processes = this_cpu_ptr(&g_processes[0]);
 
-	// if (get_smp_processor_id() == 1) {
-	// 	printf("num_processes=0x%lx, processes=0x%lx\n", num_processes, processes);
-	// }
-
 	if (!*num_processes)
 		return NULL;
 

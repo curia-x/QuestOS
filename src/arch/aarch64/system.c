@@ -66,6 +66,6 @@ void print_el(void)
 
 	get_el_info(&current_el, &el2_state, &el3_state);
 
-	printf("\r\nCurrentEL:%s\r\n", EL_TABLE[current_el]);
-	printf("%s, %s\r\n", EL2_STATE[el2_state], EL3_STATE[el3_state]);
+	pr_notice("\r\nCurrentEL:%s\r\n", EL_TABLE[current_el]);
+	pr_notice("%s, %s\r\n", EL2_STATE[el2_state], EL3_STATE[el3_state]);
 }

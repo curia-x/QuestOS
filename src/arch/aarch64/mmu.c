@@ -262,7 +262,7 @@ phys_addr_t pgtable_alloc(void)
 
 	pa = memblock_phys_alloc_range(PAGE_SIZE, PAGE_SIZE, 0, 0);
 	if (!pa) {
-		printf("Failed to allocate memory for page table\n");
+		pr_err("Failed to allocate memory for page table\n");
 		while (true)
 			;
 	}
@@ -477,7 +477,7 @@ void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
 {
 	/* Ensure that virt does not come from the linear mapping area. */
 	if (virt < PAGE_OFFSET) {
-		printf("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
+		pr_emerg("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
 			&phys, virt);
 		return;
 	}
@@ -490,7 +490,7 @@ void create_mapping_alloc(phys_addr_t phys, unsigned long virt,
 {
 	/* Ensure that virt does not come from the linear mapping area. */
 	if (virt < PAGE_OFFSET) {
-		printf("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
+		pr_emerg("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
 			&phys, virt);
 		return;
 	}

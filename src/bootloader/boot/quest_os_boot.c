@@ -22,7 +22,7 @@ int quest_os_boot_init(void)
 
 	ret = register_boot_context(&quest_os_boot_context);
 	if (ret < 0) {
-		printf("Failed to register Quest OS boot context: %d\n", ret);
+		pr_err("Failed to register Quest OS boot context: %d\n", ret);
 		return ret;
 	}
 

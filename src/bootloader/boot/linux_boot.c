@@ -22,14 +22,14 @@ static int linux_boot_prepare(struct boot_context *ctx)
 	// 读取kernel image
 	ret = qfw_load_images();
 	if (ret < 0) {
-		printf("Failed to load images from firmware: %d\n", ret);
+		pr_err("Failed to load images from firmware: %d\n", ret);
 		return ret;
 	}
 
 	// 填充必要参数
 	ret = fdt_modify_chosen("bootargs", qfw_get_bootargs());
 	if (ret < 0) {
-		printf("Failed to modify device tree: %d\n", ret);
+		pr_err("Failed to modify device tree: %d\n", ret);
 		return ret;
 	}
 
@@ -50,7 +50,7 @@ int linux_boot_init(void)
 
 	ret = register_boot_context(&linux_boot_context);
 	if (ret < 0) {
-		printf("Failed to register Linux boot context: %d\n", ret);
+		pr_err("Failed to register Linux boot context: %d\n", ret);
 		return ret;
 	}
 

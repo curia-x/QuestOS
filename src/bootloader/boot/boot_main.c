@@ -17,7 +17,7 @@ static struct boot_context *g_boot_context[MAX_OS_NUM];
 int register_boot_context(struct boot_context *ctx)
 {
 	if (g_context_count >= MAX_OS_NUM) {
-		printf("Error: Maximum number of OS contexts reached\n");
+		pr_err("Error: Maximum number of OS contexts reached\n");
 		return -ENOSPC;
 	}
 
@@ -64,14 +64,14 @@ int boot_process(boot_option_t option)
 	}
 
 	if (!ctx) {
-		printf("No boot context found for option %d\n", option);
+		pr_err("No boot context found for option %d\n", option);
 		return -EINVAL;
 	}
 
 	if (ctx->prepare) {
 		ret = ctx->prepare(ctx);
 		if (ret < 0) {
-			printf("Failed to prepare boot for %s: %d\n", ctx->name, ret);
+			pr_err("Failed to prepare boot for %s: %d\n", ctx->name, ret);
 			return ret;
 		}
 	}
@@ -81,7 +81,7 @@ int boot_process(boot_option_t option)
 	else if (ctx->kernel_entry)
 		jump_to_kernel(ctx->kernel_entry);
 
-	printf("No boot function or kernel entry point defined for %s\n", ctx->name);
+	pr_err("No boot function or kernel entry point defined for %s\n", ctx->name);
 	return -EINVAL;
 }
 
@@ -91,13 +91,13 @@ int boot_init(void)
 
 	ret = linux_boot_init();
 	if (ret < 0) {
-		printf("Failed to initialize Linux boot context: %d\n", ret);
+		pr_err("Failed to initialize Linux boot context: %d\n", ret);
 		return ret;
 	}
 
 	ret = quest_os_boot_init();
 	if (ret < 0) {
-		printf("Failed to initialize Quest OS boot context: %d\n", ret);
+		pr_err("Failed to initialize Quest OS boot context: %d\n", ret);
 		return ret;
 	}
 

@@ -27,7 +27,7 @@ struct sched_class *current_sched_class(void)
 int sched_class_register(struct sched_class *class)
 {
 	if (!class || class->type >= SCHED_TYPE_MAX) {
-		printf("sched class register failed.\n");
+		pr_err("sched class register failed.\n");
 		return -EINVAL;
 	}
 
@@ -39,13 +39,13 @@ int sched_class_register(struct sched_class *class)
 int sched_init(sched_type_t sched_type)
 {
 	if (!g_sched_classes[sched_type]) {
-		printf("sched type %u not exist\n", sched_type);
+		pr_err("sched type %u not exist\n", sched_type);
 		return -ENOENT;
 	}
 
 	g_sched_class = g_sched_classes[sched_type];
 
-	printf("sched_class:%s\n", g_sched_class->name);
+	pr_notice("sched_class:%s\n", g_sched_class->name);
 
 	return g_sched_class->init();
 }
