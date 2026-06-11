@@ -167,5 +167,6 @@ int kthread_init(void);
 void user_process_init(void);
 extern void kernel_init_task_entry(void);
 struct process_struct *get_idle_process(void);
+void user_processes_register(void);
 
 #endif /* __PROCESS_H__ */

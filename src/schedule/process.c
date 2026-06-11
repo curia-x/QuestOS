@@ -968,7 +968,7 @@ static int load_processes(void)
 	return loaded_count;
 }
 
-static void user_processes_register(void)
+void user_processes_register(void)
 {
 	int err;
 
@@ -997,7 +997,6 @@ static void user_processes_init(void)
 	printf("Load %d processes\n", count);
 
 	user_processes_struct_init();
-	user_processes_register();
 }
 
 void user_process_init(void)

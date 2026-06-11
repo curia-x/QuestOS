@@ -90,10 +90,12 @@ void quest_os_main(void)
 		goto exit;
 	}
 
-	printf("Press any key to schdule user app process\n");
+	user_process_init();
+
+	printf("\n=========Press any key to load user app process=========\n\n");
 	uart_recv();
 
-	user_process_init();
+	user_processes_register();
 
 	local_sched_timer_start();
 
