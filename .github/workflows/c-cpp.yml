@@ -1,0 +1,58 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu \
+            python3 \
+            qemu-system-arm
+
+      - name: Build
+        run: make -j$(nproc)
+
+      - name: Run QEMU smoke test
+        run: |
+          set +e
+          timeout 10s bash -c '
+            { sleep 1; printf q; sleep 1; printf x; } | qemu-system-aarch64 \
+              -M virt,virtualization=false,secure=off,gic-version=3,its=on \
+              -m size=1024M \
+              -cpu cortex-a72,pmu=on \
+              -smp 4 \
+              -bios build/quest_os_pack_all.bin \
+              -nographic
+          ' 2>&1 | tee qemu.log
+          ret=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$ret" -ne 0 ] && [ "$ret" -ne 124 ]; then
+            exit "$ret"
+          fi
+
+          grep -F "Loaded 10 user processes" qemu.log
+          grep -F "app 10 running" qemu.log
+
+          for cpu in 0 1 2 3; do
+            grep -F "cpu[${cpu}]:" qemu.log
+          done
+
+          ! grep -Ei "BUG:|panic|Oops|Unhandled|Data abort|Instruction abort|SError|ESR_EL1|FAR_EL1" qemu.log
+
+      - name: Clean
+        run: make clean
