@@ -1,0 +1,3 @@
+[submodule "thirdparty/tf-a"]
+	path = thirdparty/tf-a
+	url = https://github.com/curia-x/arm-trusted-firmware.git
