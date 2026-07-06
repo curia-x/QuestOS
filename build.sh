@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0
 
 PROJECT_BUILD_DIR=build
+DIRECT_KERNEL_BUILD_DIR="${PROJECT_BUILD_DIR}/direct_kernel"
 
 build() {
 	make OUT_DIR=${PROJECT_BUILD_DIR} -j$(nproc)
@@ -15,23 +16,27 @@ build_kernel() {
 	make OUT_DIR=${PROJECT_BUILD_DIR} -j$(nproc) kernel
 }
 
+build_direct_kernel() {
+	make OUT_DIR=${DIRECT_KERNEL_BUILD_DIR} CONFIG_PSCI_METHOD=hvc -j$(nproc) kernel
+}
+
 clean() {
 	make OUT_DIR=${PROJECT_BUILD_DIR} -j$(nproc) clean
 }
 
 run() {
-	make  OUT_DIR=${PROJECT_BUILD_DIR} -j$(nproc) && \
-    sh ./qemu_run.sh -bios ${PROJECT_BUILD_DIR}/quest_os_pack_all.bin
+	build && \
+    sh ./qemu_run.sh -bios "${PROJECT_BUILD_DIR}/qemu_fw.bios"
 }
 
 run_kernel() {
-	make  OUT_DIR=${PROJECT_BUILD_DIR} -j$(nproc) && \
-    sh ./qemu_run.sh -bios ${PROJECT_BUILD_DIR}/quest_os_kernel.bin
+	build_direct_kernel && \
+    sh ./qemu_run.sh --secure=off -bios "${DIRECT_KERNEL_BUILD_DIR}/quest_os_kernel.bin"
 }
 
 debug() {
-	make OUT_DIR=${PROJECT_BUILD_DIR} -j$(nproc) && \
-    sh ./qemu_run.sh -bios ${PROJECT_BUILD_DIR}/quest_os_pack_all.bin debug
+	build && \
+    sh ./qemu_run.sh -bios "${PROJECT_BUILD_DIR}/qemu_fw.bios" debug
 }
 
 qemu_info() {

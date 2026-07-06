@@ -19,9 +19,10 @@ APPEND="$APPEND sysrq_always_enabled=1"
 INFO=
 DEBUG=
 BIOS=quest_os.bin
+SECURE=on
 
 usage() {
-    echo "Usage: $0 [debug|-d|--debug] [info|--info] [-bios FILE|-bios=FILE]" >&2
+    echo "Usage: $0 [debug|-d|--debug] [info|--info] [-bios FILE|-bios=FILE] [--secure on|off|--secure=on|off]" >&2
     exit 1
 }
 
@@ -31,7 +32,7 @@ do
     case "$1" in
         -bios)
             if [ $# -lt 2 ]; then
-                echo "错误: -bios 缺少参数" >&2
+                echo "error: -bios missing argument" >&2
                 exit 1
             fi
             BIOS="$2"
@@ -39,6 +40,18 @@ do
             ;;
         -bios=*)
             BIOS="${1#-bios=}"
+            shift
+            ;;
+        --secure)
+            if [ $# -lt 2 ]; then
+                echo "error: --secure missing argument" >&2
+                exit 1
+            fi
+            SECURE="$2"
+            shift 2
+            ;;
+        --secure=*)
+            SECURE="${1#--secure=}"
             shift
             ;;
         debug|--debug|-d)
@@ -59,16 +72,24 @@ do
     esac
 done
 
+case "$SECURE" in
+    on|off)
+        ;;
+    *)
+        echo "error: --secure can only be on or off" >&2
+        exit 1
+        ;;
+esac
+
 set -- \
     qemu-system-aarch64 \
-            -kernel $KERNEL_IMAGE_PATH \
+            -kernel "$KERNEL_IMAGE_PATH" \
             -append "$APPEND" \
-            -M virt,virtualization=false,secure=off,gic-version=3,its=on \
+            -M "virt,virtualization=false,secure=$SECURE,gic-version=3,its=on" \
             -m size=1024M \
             -cpu cortex-a72,pmu=on \
             -smp 4 \
-            -bios $BIOS \
-            -dtb $DTB_PATH \
+            -bios "$BIOS" \
             -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
             -device virtio-net-device,netdev=net0
 

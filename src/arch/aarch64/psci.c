@@ -6,6 +6,9 @@
 #include <print.h>
 
 #define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN64_##name
+#ifndef CONFIG_PSCI_METHOD
+#define CONFIG_PSCI_METHOD "smc"
+#endif
 
 typedef unsigned long (psci_fn)(unsigned long, unsigned long,
 				unsigned long, unsigned long);
@@ -104,5 +107,5 @@ int psci_init(void)
 {
 	g_psci_ops = &psci_0_2_ops;
 
-	return g_psci_ops->init("hvc");
+	return g_psci_ops->init(CONFIG_PSCI_METHOD);
 }
