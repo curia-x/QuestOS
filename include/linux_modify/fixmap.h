@@ -21,7 +21,7 @@
 #include <pgtable-prot.h>
 
 #ifndef __ASSEMBLY__
-
+#include <system.h>
 #include <linux/math.h>
 
 #ifndef FIXMAP_PAGE_NORMAL
@@ -95,13 +95,13 @@ enum fixed_addresses {
  */
 static __always_inline unsigned long fix_to_virt(const unsigned int idx)
 {
-	// BUILD_BUG_ON(idx >= __end_of_fixed_addresses);
+	BUG_ON(idx >= __end_of_fixed_addresses);
 	return __fix_to_virt(idx);
 }
 
 static inline unsigned long virt_to_fix(const unsigned long vaddr)
 {
-	// BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
 	return __virt_to_fix(vaddr);
 }
 

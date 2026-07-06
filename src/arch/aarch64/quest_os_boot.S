@@ -13,16 +13,12 @@
 .section ".idmap.text","ax"
 
 SYM_FUNC_START(quest_os_entry)
-	/*
-	 * 如果cache已关闭(C==0)，mmu处于关闭状态；
-	 * 否则，如果M == 0表示mmu关闭，M == 1表示mmu打开，记录到x19中
-	 */
+	mov	x21, x0	/* preserve FDT pointer */
 	bl	record_mmu_state
-	bl	preserve_boot_args // 保存bootloader传过来的x0 .. x3到boot_args
 
-	adrp	x1, early_init_stack	// 将early_init_stack地址加载到x1。adr只能寻址±1MB，adrp可以寻址±4GB
+	adrp	x1, early_init_stack
 	mov	sp, x1
-	mov	x29, xzr	// 把 frame pointer 置空，表示“这里是调用栈的根，没有上一级帧”。
+	mov	x29, xzr
 	adrp	x0, __pi_init_idmap_pg_dir
 	bl	mmu_init_idmap_table
 	mov	x1, x0
@@ -33,7 +29,6 @@ SYM_FUNC_START(quest_os_entry)
 	 */
 	cbnz	x19, 0f
 	dmb     sy
-	mrs x2, ctr_el0
 	adrp    x0, __pi_init_idmap_pg_dir
 	adr_l	x2, dcache_inval_poc
 	blr	x2
@@ -50,18 +45,13 @@ SYM_FUNC_START(quest_os_entry)
 	blr	x2
 
 1:	mov	x0, x19
-	/* 初始化el相关pstate和sctlr_elx */
-	bl	init_kernel_el			// w0=cpu_boot_mode
+	/* Initialize EL-related pstate and sctlr_elx. */
+	bl	init_kernel_el
+	/* w0=cpu_boot_mode */
 	mov	x20, x0
 
-	/* 设置tcr和mair，返回打开mmu的sctlr配置(x0) */
-	/*
-	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
-	 * details.
-	 * On return, the CPU will be ready for the MMU to be turned on and
-	 * the TCR will have been set.
-	 */
-	bl	__cpu_setup			// initialise processor
+	/* Set TCR and MAIR, return the SCTLR configuration (x0) with MMU enabled. */
+	bl	__cpu_setup
 	b	__primary_switch
 	SYM_FUNC_END(quest_os_entry)
 
@@ -72,8 +62,8 @@ SYM_CODE_START_LOCAL(record_mmu_state)
 	b.eq	proc_hang	// TODO: 目前不支持EL2，后续实现了EL2再改这里
 
 	tbnz	x19, #SCTLR_ELx_EE_SHIFT, 1f	// 如果不是小端模式，则进行修正
-	tst	x19, #SCTLR_ELx_C		// Z := (C == 0)    // C == 0 表示Non-cacheable
-	and	x19, x19, #SCTLR_ELx_M		// isolate M bit	// M == 0 表示MMU is off
+	tst	x19, #SCTLR_ELx_C		// Z := (C == 0)
+	and	x19, x19, #SCTLR_ELx_M		// isolate M bit
 	csel	x19, xzr, x19, eq		// clear x19 if Z
 	ret
 
@@ -91,28 +81,6 @@ SYM_CODE_START_LOCAL(record_mmu_state)
 	ret
 SYM_CODE_END(record_mmu_state)
 
-/*
- * Preserve the arguments passed by the bootloader in x0 .. x3
- */
-SYM_CODE_START_LOCAL(preserve_boot_args)
-	mov	x21, x0				// x21=FDT	// x0: bootloader传入的FDT地址
-
-	adr_l	x0, boot_args			// record the contents of // 保存boot_args地址到x0
-	stp	x21, x1, [x0]			// x0 .. x3 at kernel entry	// 保存fdt地址和boot mode到boot_args
-	stp	x2, x3, [x0, #16]									// 保存x2和x3到boot_args
-
-	cbnz	x19, 0f		// skip cache invalidation if MMU is on
-	dmb	sy				// needed before dc ivac with
-						// MMU off
-
-	add	x1, x0, #0x20			// 4 x 8 bytes
-	b	dcache_inval_poc		// tail call	// 函数内部有ret指令，因此函数内部会直接返回上层，不会再执行"0:"之后的代码
-0:	str_l   x19, mmu_enabled_at_boot, x0
-	/* 因为开发者保证不会在mmu关闭的时候去读boot_args，所以这里不需要clean cache */
-	/* 另外arm v8中D-cache 的 tag 是按物理地址来的，即使有页表切换，只要“同一个物理页”在新旧页表中属性一致，cache 里的那行照样是合法的 */
-	ret
-SYM_CODE_END(preserve_boot_args)
-
 SYM_FUNC_START(init_kernel_el)
 	mrs	x1, CurrentEL
 	cmp	x1, #CurrentEL_EL2
@@ -126,8 +94,6 @@ SYM_INNER_LABEL(init_el1, SYM_L_LOCAL)
 	msr	spsr_el1, x0
 	msr	elr_el1, lr
 	mov	w0, #BOOT_CPU_MODE_EL1
-	/* AArch64 里 没有一条指令可以直接“设置整个 PSTATE/模式” */
-	/* 借用eret，一次性把 PC 和 PSTATE 一起切换到内核期望的状态 */
 	eret
 SYM_FUNC_END(init_kernel_el)
 
@@ -214,7 +180,7 @@ SYM_FUNC_START(__cpu_setup)
 	 * Prepare SCTLR
 	 */
 	mov_q	x0, INIT_SCTLR_EL1_MMU_ON
-	ret					// return to head.S
+	ret
 
 	.unreq	mair
 	.unreq	tcr
@@ -223,32 +189,33 @@ SYM_FUNC_END(__cpu_setup)
 SYM_FUNC_START_LOCAL(__primary_switch)
 	adrp	x1, reserved_pg_dir
 	adrp	x2, __pi_init_idmap_pg_dir
-	/* 配置ttbr_el0/ttbr_el1, 打开mmu */
+	/* Configure ttbr_el0/ttbr_el1 and enable MMU. */
 	bl		__enable_mmu
 
 	adrp	x1, early_init_stack
 	mov		sp, x1
-	mov		x29, xzr	// 把 frame pointer 置空，表示“这里是调用栈的根，没有上一级帧”。
-	mov		x0, x20				// pass the full boot status
-	mov		x1, x21				// pass the FDT
+	mov		x0, x20	/* x20: cpu_boot_mode. */
+	mov		x1, x21	/* x21: fdt */
 	bl		early_map_kernel		// Map and relocate the kernel
 
-	// 如果打开了CONFIG_RELOCATABLE, 那__primary_switched已经重定位成正确的地址，
-	// 因此不会出错
+	/* Jump to the final kernel mapping. */
 	ldr		x8, =__primary_switched
-	adr		x0, _stext		// __pa(_start)
+	adr		x0, _stext		// __pa(_stext)
 
 	br		x8
 SYM_FUNC_END(__primary_switch)
 
 SYM_FUNC_START(__enable_mmu)
+	/* We just support 4KB granule size now. */
 	mrs	x3, ID_AA64MMFR0_EL1
 	ubfx	x3, x3, #ID_AA64MMFR0_EL1_TGRAN4_SHIFT, 4
 	cmp     x3, #ID_AA64MMFR0_EL1_TGRAN_SUPPORTED_MIN
 	b.lt    proc_hang
 	cmp     x3, #ID_AA64MMFR0_EL1_TGRAN_SUPPORTED_MAX
 	b.gt    proc_hang
-	msr		ttbr0_el1, x2			// load TTBR0
+
+	/* Load page table. */
+	msr		ttbr0_el1, x2
 	msr		ttbr1_el1, x1
 	isb
 
@@ -267,7 +234,7 @@ SYM_FUNC_START_LOCAL(load_init_task)
 	/* current = x0 */
 	msr sp_el0, x0
 
-	/* process->pc = x1 */
+	/* process->pc = c_entry */
 	str x1, [x0, #PROCESS_PC_OFFS]
 	mov x30, x1
 
@@ -288,11 +255,9 @@ SYM_FUNC_START_LOCAL(load_init_task)
 	mov sp, x1
 	str x1, [x0, #PROCESS_SP_OFFS]
 
-	adr_l	x8, exception_vector_table			// load VBAR_EL1 with virtual
-	msr	vbar_el1, x8			// vector table address
+	adr_l	x8, exception_vector_table
+	msr	vbar_el1, x8
 	isb
-
-	mov x29, xzr
 
 	ret
 SYM_FUNC_END(load_init_task)
@@ -302,15 +267,18 @@ SYM_FUNC_END(load_init_task)
  *   x0 = __pa(_stext)
  */
 SYM_FUNC_START_LOCAL(__primary_switched)
-	adrp	x4, _stext			// Save the offset between
-	sub		x4, x4, x0			// the kernel virtual and
-	str_l	x4, kimage_voffset, x5		// physical mappings
+	mov x29, xzr
+	/* Save the offset between the kernel virtual and physical mappings. */
+	adrp	x4, _stext
+	sub		x4, x4, x0
+	str_l	x4, kimage_voffset, x5
 
 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
 
 	mov	x0, x20
 	bl	set_cpu_boot_mode_flag
 
+	/* Load init process and jump to C routine. */
 	ldr x0, =g_kernel_init_process
 	ldr x1, =quest_os_main
 	b load_init_task
@@ -318,7 +286,7 @@ SYM_FUNC_END(__primary_switched)
 
 /*
  * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
- * in w0. See arch/arm64/include/asm/virt.h for more info.
+ * in w0.
  */
 SYM_FUNC_START_LOCAL(set_cpu_boot_mode_flag)
 	adr_l	x1, __boot_cpu_mode

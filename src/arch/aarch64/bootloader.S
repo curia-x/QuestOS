@@ -15,9 +15,7 @@ _start:
 	cbz x0, init_flow  /* cpu0继续初始化 */
 	b proc_hang  /* 其他cpu原地自旋 */
 
-/*
- * x20: CPU boot mode(BOOT_CPU_MODE_EL1/BOOT_CPU_MODE_EL2)
- */
+/* x0: bootcpu id */
 init_flow:
 	mov x19, x0
 

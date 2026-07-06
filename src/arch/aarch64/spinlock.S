@@ -4,7 +4,7 @@
 #include <asm/generated/asm-offsets.h>
 
 /*
- * x0: struct spinlock *lock;
+ * x0: u32 *state;
  */
 SYM_FUNC_START(raw_arch_spin_lock)
 1:

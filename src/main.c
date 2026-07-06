@@ -16,16 +16,9 @@
 #include <smp.h>
 #include <psci.h>
 
-#define CACHELINE_SIZE 64
-/*
- * The recorded values of x0 .. x3 upon kernel entry.
- */
-u64 __aligned(CACHELINE_SIZE) boot_args[4];
-u64 mmu_enabled_at_boot;
 phys_addr_t __fdt_pointer __initdata;
 u32 __boot_cpu_mode[] = { BOOT_CPU_MODE_EL2, BOOT_CPU_MODE_EL1 };
 bool arm64_use_ng_mappings;
-
 u64 kimage_voffset;
 
 void quest_os_main(void)

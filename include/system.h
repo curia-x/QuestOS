@@ -13,19 +13,6 @@ void print_el();
 bool in_kernel(void);
 void record_enter_in_kernel(void);
 
-// static inline void cpu_relax(void)
-// {
-//     /* volatile：告诉编译器不要优化/移动这段代码，确保它在原处执行
-// 	 * "yield"：是 ARM64 的一条提示指令。向 CPU 发出提示：当前线程正在忙等待自旋（spin-waiting）
-// 	 *          CPU 可以根据这个提示优化资源分配：
-//      *              降低功耗
-//      *              让出执行资源给其他线程
-//      *              在同时多线程（SMT）处理器上，让另一个线程获得更多执行资源
-// 	 * "memory": 编译器屏障。编译器不能跨过这条指令重新排列内存访问。防止指令被优化。
-//      */
-// 	asm volatile("yield" ::: "memory");
-// }
-
 #define __BUG(cond_str) do {						\
 	const char *__cond_str = (cond_str);					\
 	pr_emerg("BUG:%s, %d%s%s\r\n",	\

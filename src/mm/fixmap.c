@@ -47,7 +47,6 @@ static void fixmap_init_pmd(pmd_t *pmd, u64 va_start, u64 va_end)
 {
 	u64 *pmd_entry_start = PMD_ENTRY(pmd, va_start);
 	u64 *pmd_entry_end = PMD_ENTRY(pmd, va_end - 1);
-	// u64 *pte_table;
 
 	do {
 		*pmd_entry_start = virt_to_kimg_phys(bm_pte[BM_PTE_TABLE_IDX(va_start)]) |
