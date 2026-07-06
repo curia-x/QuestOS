@@ -3,7 +3,6 @@
 
 ROOTFS_PATH=/home/book/qemu_resource/rootfs_aarch64
 KERNEL_IMAGE_PATH=/home/book/source_code/linux/arch/arm64/boot/Image
-DTB_PATH=/home/book/qemu_resource/cortex-a72_gicv3_smp_4.dtb
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Re-running script as root..."
