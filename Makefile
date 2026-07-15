@@ -155,6 +155,9 @@ app: $(OUT_DIR)/app/$(PROJECT_NAME)_app_pack.elf
 
 $(ATF_QEMU_FW_BIN): $(OUT_DIR)/$(PROJECT_NAME)_pack_all.bin FORCE
 	$(Q) $(ECHO) "ATF	$@"
+	$(Q) test -d $(TF_A_DIR)/.git || git submodule update --init --recursive thirdparty/tf-a
+	$(Q) test -d $(TF_A_DIR)/contrib/mbed-tls/.git || \
+		(cd $(TF_A_DIR) && git submodule update --init --recursive --depth=1 contrib/mbed-tls)
 	$(Q) $(ATF_ENV) $(MAKE) -C $(TF_A_DIR) PLAT=$(ATF_PLAT) DEBUG=$(ATF_DEBUG) \
 		CROSS_COMPILE=$(CROSS_COMPILE) BL33=$(abspath $<) \
 		QEMU_USE_GIC_DRIVER=$(ATF_GIC_DRIVER) \
