@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
 
       - name: Install dependencies
         run: |
@@ -26,8 +26,8 @@ jobs:
             python3 \
             qemu-system-arm
 
-      - name: Build TF-A firmware flow
-        run: make -j$(nproc)
+      - name: Build TF-A trusted boot firmware flow
+        run: make -j$(nproc) ATF_SECURE_BOOT=1
 
       - name: Check firmware outputs
         run: |
@@ -36,6 +36,21 @@ jobs:
           test -s build/bl31.bin
           test -s build/fip.bin
           test -s build/qemu_fw.bios
+
+      - name: Check trusted boot outputs
+        run: |
+          atf_build=thirdparty/tf-a/build/qemu/debug
+
+          test -s "$atf_build/tb_fw.crt"
+          test -s "$atf_build/trusted_key.crt"
+          test -s "$atf_build/soc_fw_key.crt"
+          test -s "$atf_build/soc_fw_content.crt"
+          test -s "$atf_build/nt_fw_key.crt"
+          test -s "$atf_build/nt_fw_content.crt"
+          test -s "$atf_build/rotpk_sha256.bin"
+
+          aarch64-linux-gnu-nm "$atf_build/bl1/qemu_common.o" | grep -F "plat_get_mbedtls_heap"
+          aarch64-linux-gnu-nm "$atf_build/bl2/qemu_common.o" | grep -F "plat_get_mbedtls_heap"
 
       - name: Build direct kernel flow
         run: make -j$(nproc) direct_kernel
