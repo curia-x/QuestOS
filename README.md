@@ -2,12 +2,12 @@
 
 Quest OS 是一个实验性的 AArch64 Linux-like kernel bringup 项目。它对照
 Linux 的实现思路，在 QEMU `virt` 平台上实现从早期启动、MMU、设备树、中断、
-SMP、调度、系统调用到 EL0 用户态 demo 的完整运行路径。
+SMP、调度、系统调用到 EL0 用户态 demo 的运行路径。
 
 仓库同时包含 QLoader 组件。QLoader 可以作为 QEMU 的 `-bios` 镜像启动，完成
 早期平台初始化，并在串口菜单中选择启动 Linux 或进入 Quest OS 路径。
 
-更详细的 Linux 机制对照、相同点、差异点和项目亮点见
+更详细的 Linux 机制对照、相同点、差异点和实现说明见
 [`docs/linux-mechanisms.md`](docs/linux-mechanisms.md)。
 
 ## 当前状态
@@ -30,11 +30,14 @@ QEMU。以 Debian 或 Ubuntu 环境为例:
 sudo apt install build-essential gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libssl-dev python3 qemu-system-arm
 ```
 
-首次 clone 后需要拉取 TF-A submodule:
+首次 clone 后建议拉取 TF-A submodule:
 
 ```sh
 git submodule update --init --recursive
 ```
+
+如果 submodule 缺失，默认 ATF 构建规则会在调用 TF-A 前补齐
+`thirdparty/tf-a` 和嵌套的 `contrib/mbed-tls`。
 
 默认工具链前缀是 `aarch64-linux-gnu-`。如果你的工具链前缀不同，可以在
 构建时覆盖:
@@ -285,7 +288,7 @@ app/config/app-config.toml
 ```
 
 `app/tools/proc_pack.py` 会根据配置把 demo ELF 文件打包成 process package，
-再通过 `objcopy` 转换成 AArch64 ELF 对象，最终链接进组合镜像。当前默认
+再通过 `objcopy` 转换成 AArch64 ELF 对象并链接进组合镜像。当前默认
 配置会打包 `app1` 到 `app10`，用于验证进程数量多于 CPU 数量时的调度路径。
 
 ## 目录结构
